@@ -31,7 +31,7 @@ void receiveMessages(SOCKET clientSocket) {
         }
 
         std::string message(buffer, bytesReceived);
-        std::cout << "\n[SERVER] " << message << "\n> ";
+        std::cout << "\n" << message << "\n> ";
         std::cout.flush();
     }
 }
@@ -94,10 +94,22 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "Connected to Smart Cafe POS Server.\n";
-    std::cout << "Type message and press Enter.\n";
-    std::cout << "Type /quit to exit.\n\n";
 
     std::thread receiverThread(receiveMessages, clientSocket);
+
+    std::string role;
+    std::cout << "\nChoose role: CASHIER / KITCHEN / MANAGER\n";
+    std::cout << "> ";
+    std::getline(std::cin, role);
+
+    std::string roleCommand = "ROLE " + role;
+    send(clientSocket, roleCommand.c_str(), roleCommand.size(), 0);
+
+    std::cout << "\nCommands:\n";
+    std::cout << "CASHIER: ORDER table=1 items=Latte x2\n";
+    std::cout << "KITCHEN: STATUS order=1 cooking\n";
+    std::cout << "MANAGER: REPORT daily revenue checked\n";
+    std::cout << "Exit: /quit\n\n";
 
     std::string message;
 

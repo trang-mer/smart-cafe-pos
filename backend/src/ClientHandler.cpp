@@ -1,8 +1,10 @@
 #include "ClientHandler.h"
+#include "Server.h"
 #include "Logger.h"
 
 #include <iostream>
 #include <string>
+#include <cstring>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -11,8 +13,8 @@
 #include <sys/socket.h>
 #endif
 
-ClientHandler::ClientHandler(SOCKET clientSocket)
-    : clientSocket(clientSocket) {}
+ClientHandler::ClientHandler(SOCKET clientSocket, Server* server)
+    : clientSocket(clientSocket), server(server) {}
 
 void ClientHandler::handle() {
     char buffer[1024];
@@ -32,9 +34,10 @@ void ClientHandler::handle() {
         std::string message(buffer, bytesReceived);
         Logger::info("Received: " + message);
 
-        std::string response = "Server received: " + message;
-        send(clientSocket, response.c_str(), response.size(), 0);
+        server->broadcastMessage(message, clientSocket);
     }
+
+    server->removeClient(clientSocket);
 
 #ifdef _WIN32
     closesocket(clientSocket);

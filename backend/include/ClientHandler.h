@@ -7,13 +7,18 @@
 typedef int SOCKET;
 #endif
 
+class Server;
+
 class ClientHandler {
 public:
-    explicit ClientHandler(SOCKET clientSocket);
+    ClientHandler(SOCKET clientSocket, Server* server);
     void handle();
 
 private:
     SOCKET clientSocket;
+    Server* server;
+
+    void processMessage(const std::string& message);
 };
 
 #endif

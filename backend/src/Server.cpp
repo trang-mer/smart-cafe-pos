@@ -4,6 +4,7 @@
 
 #include <thread>
 #include <string>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -82,14 +83,123 @@ void Server::run() {
             continue;
         }
 
-        Logger::info("New client connected");
+        addClient(clientSocket);
 
-        std::thread clientThread([clientSocket]() {
-            ClientHandler handler(clientSocket);
+        std::thread clientThread([this, clientSocket]() {
+            ClientHandler handler(clientSocket, this);
             handler.handle();
         });
 
         clientThread.detach();
+    }
+}
+
+void Server::addClient(SOCKET clientSocket) {
+    std::lock_guard<std::mutex> lock(clientsMutex);
+
+    ClientInfo clientInfo;
+    clientInfo.socket = clientSocket;
+    clientInfo.role = ClientRole::UNKNOWN;
+
+    clients.push_back(clientInfo);
+
+    Logger::info("New client connected. Total clients: " + std::to_string(clients.size()));
+}
+
+void Server::removeClient(SOCKET clientSocket) {
+    std::lock_guard<std::mutex> lock(clientsMutex);
+
+    clients.erase(
+        std::remove_if(
+            clients.begin(),
+            clients.end(),
+            [clientSocket](const ClientInfo& client) {
+                return client.socket == clientSocket;
+            }
+        ),
+        clients.end()
+    );
+
+    Logger::info("Client removed. Total clients: " + std::to_string(clients.size()));
+}
+
+void Server::setClientRole(SOCKET clientSocket, ClientRole role) {
+    std::lock_guard<std::mutex> lock(clientsMutex);
+
+    for (auto& client : clients) {
+        if (client.socket == clientSocket) {
+            client.role = role;
+            Logger::info("Client role set to " + roleToString(role));
+            return;
+        }
+    }
+}
+
+ClientRole Server::getClientRole(SOCKET clientSocket) {
+    std::lock_guard<std::mutex> lock(clientsMutex);
+
+    for (const auto& client : clients) {
+        if (client.socket == clientSocket) {
+            return client.role;
+        }
+    }
+
+    return ClientRole::UNKNOWN;
+}
+
+void Server::sendToClient(SOCKET clientSocket, const std::string& message) {
+    send(clientSocket, message.c_str(), message.size(), 0);
+}
+
+void Server::sendToRole(ClientRole role, const std::string& message) {
+    std::lock_guard<std::mutex> lock(clientsMutex);
+
+    for (const auto& client : clients) {
+        if (client.role == role) {
+            send(client.socket, message.c_str(), message.size(), 0);
+        }
+    }
+}
+
+void Server::sendToRoles(const std::vector<ClientRole>& roles, const std::string& message) {
+    std::lock_guard<std::mutex> lock(clientsMutex);
+
+    for (const auto& client : clients) {
+        for (ClientRole role : roles) {
+            if (client.role == role) {
+                send(client.socket, message.c_str(), message.size(), 0);
+                break;
+            }
+        }
+    }
+}
+
+ClientRole Server::parseRole(const std::string& roleText) {
+    if (roleText == "CASHIER") {
+        return ClientRole::CASHIER;
+    }
+
+    if (roleText == "KITCHEN") {
+        return ClientRole::KITCHEN;
+    }
+
+    if (roleText == "MANAGER") {
+        return ClientRole::MANAGER;
+    }
+
+    return ClientRole::UNKNOWN;
+}
+
+std::string Server::roleToString(ClientRole role) {
+    switch (role) {
+        case ClientRole::CASHIER:
+            return "CASHIER";
+        case ClientRole::KITCHEN:
+            return "KITCHEN";
+        case ClientRole::MANAGER:
+            return "MANAGER";
+        default:
+            return "UNKNOWN";
     }
 }
 
