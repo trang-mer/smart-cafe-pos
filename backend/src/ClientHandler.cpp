@@ -1,6 +1,7 @@
 #include "ClientHandler.h"
 #include "Server.h"
 #include "Logger.h"
+#include "OrderManager.h"
 
 #include <string>
 #include <cstring>
@@ -123,69 +124,101 @@ void ClientHandler::processJsonMessage(const std::string& jsonText) {
     }
 
     if (type == "ORDER") {
-        if (senderRole != ClientRole::CASHIER) {
-            json errorResponse = {
-                {"type", "ERROR"},
-                {"message", "Only CASHIER can create orders."}
-            };
-
-            server->sendToClient(clientSocket, errorResponse.dump());
-            return;
-        }
-
-        json notification = {
-            {"type", "ORDER_CREATED"},
-            {"from", "CASHIER"},
-            {"table", message.value("table", 0)},
-            {"items", message.value("items", json::array())},
-            {"note", message.value("note", "")}
+    if (senderRole != ClientRole::CASHIER) {
+        json errorResponse = {
+            {"type", "ERROR"},
+            {"message", "Only CASHIER can create orders."}
         };
 
-        server->sendToRoles(
-            {ClientRole::KITCHEN, ClientRole::MANAGER},
-            notification.dump()
-        );
-
-        json response = {
-            {"type", "ORDER_SENT"},
-            {"message", "Order sent to kitchen and manager."}
-        };
-
-        server->sendToClient(clientSocket, response.dump());
+        server->sendToClient(clientSocket, errorResponse.dump());
         return;
     }
+
+    int tableNumber = message.value("table", 0);
+    json items = message.value("items", json::array());
+    std::string note = message.value("note", "");
+
+    int orderId = server->getOrderManager().createOrder(
+        tableNumber,
+        items,
+        note
+    );
+
+    json createdOrder = server->getOrderManager().getOrderJson(orderId);
+
+    json notification = {
+        {"type", "ORDER_CREATED"},
+        {"order", createdOrder}
+    };
+
+    server->sendToRoles(
+        {ClientRole::KITCHEN, ClientRole::MANAGER},
+        notification.dump()
+    );
+
+    json response = {
+        {"type", "ORDER_CREATED_SUCCESS"},
+        {"message", "Order created successfully."},
+        {"order", createdOrder}
+    };
+
+    server->sendToClient(clientSocket, response.dump());
+    return;
+}
 
     if (type == "STATUS") {
-        if (senderRole != ClientRole::KITCHEN) {
-            json errorResponse = {
-                {"type", "ERROR"},
-                {"message", "Only KITCHEN can update order status."}
-            };
-
-            server->sendToClient(clientSocket, errorResponse.dump());
-            return;
-        }
-
-        json notification = {
-            {"type", "ORDER_STATUS_UPDATED"},
-            {"from", "KITCHEN"},
-            {"orderId", message.value("orderId", 0)},
-            {"status", message.value("status", "unknown")}
+    if (senderRole != ClientRole::KITCHEN) {
+        json errorResponse = {
+            {"type", "ERROR"},
+            {"message", "Only KITCHEN can update order status."}
         };
 
-        server->sendToRoles(
-            {ClientRole::CASHIER, ClientRole::MANAGER},
-            notification.dump()
-        );
-
-        json response = {
-            {"type", "STATUS_SENT"},
-            {"message", "Status sent to cashier and manager."}
-        };
-
-        server->sendToClient(clientSocket, response.dump());
+        server->sendToClient(clientSocket, errorResponse.dump());
         return;
     }
+
+    int orderId = message.value("orderId", 0);
+    std::string statusText = message.value("status", "pending");
+
+    OrderStatus newStatus = OrderManager::parseStatus(statusText);
+
+    bool updated = server->getOrderManager().updateOrderStatus(
+        orderId,
+        newStatus
+    );
+
+    if (!updated) {
+        json errorResponse = {
+            {"type", "ERROR"},
+            {"message", "Order not found."},
+            {"orderId", orderId}
+        };
+
+        server->sendToClient(clientSocket, errorResponse.dump());
+        return;
+    }
+
+    json updatedOrder = server->getOrderManager().getOrderJson(orderId);
+
+    json notification = {
+        {"type", "ORDER_STATUS_UPDATED"},
+        {"order", updatedOrder}
+    };
+
+    server->sendToRoles(
+        {ClientRole::CASHIER, ClientRole::MANAGER},
+        notification.dump()
+    );
+
+    json response = {
+        {"type", "STATUS_UPDATED_SUCCESS"},
+        {"message", "Order status updated successfully."},
+        {"order", updatedOrder}
+    };
+
+    server->sendToClient(clientSocket, response.dump());
+    return;
+}
 
     if (type == "REPORT") {
         if (senderRole != ClientRole::MANAGER) {
@@ -217,6 +250,18 @@ void ClientHandler::processJsonMessage(const std::string& jsonText) {
         server->sendToClient(clientSocket, response.dump());
         return;
     }
+
+    if (type == "GET_ORDERS") {
+    json orders = server->getOrderManager().getAllOrdersJson();
+
+    json response = {
+        {"type", "ORDERS_LIST"},
+        {"orders", orders}
+    };
+
+    server->sendToClient(clientSocket, response.dump());
+    return;
+}
 
     json errorResponse = {
         {"type", "ERROR"},

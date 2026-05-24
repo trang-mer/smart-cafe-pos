@@ -1,6 +1,8 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include "OrderManager.h"
+
 #include <vector>
 #include <mutex>
 #include <string>
@@ -41,6 +43,8 @@ public:
     void sendToRole(ClientRole role, const std::string& message);
     void sendToRoles(const std::vector<ClientRole>& roles, const std::string& message);
 
+    OrderManager& getOrderManager();
+
     static ClientRole parseRole(const std::string& roleText);
     static std::string roleToString(ClientRole role);
 
@@ -51,6 +55,8 @@ private:
 
     std::vector<ClientInfo> clients;
     std::mutex clientsMutex;
+
+    OrderManager orderManager;
 };
 
 #endif

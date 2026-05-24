@@ -179,6 +179,10 @@ void Server::sendToRoles(const std::vector<ClientRole>& roles, const std::string
     }
 }
 
+OrderManager& Server::getOrderManager() {
+    return orderManager;
+}
+
 ClientRole Server::parseRole(const std::string& roleText) {
     if (roleText == "CASHIER") return ClientRole::CASHIER;
     if (roleText == "KITCHEN") return ClientRole::KITCHEN;
