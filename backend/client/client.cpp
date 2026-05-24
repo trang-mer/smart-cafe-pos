@@ -4,6 +4,8 @@
 #include <atomic>
 #include <cstring>
 
+#include "nlohmann/json.hpp"
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
@@ -14,10 +16,18 @@
 #include <sys/socket.h>
 #endif
 
+using json = nlohmann::json;
+
 std::atomic<bool> running(true);
+
+void sendJson(SOCKET socket, const json& data) {
+    std::string text = data.dump() + "\n";
+    send(socket, text.c_str(), text.size(), 0);
+}
 
 void receiveMessages(SOCKET clientSocket) {
     char buffer[1024];
+    std::string pendingData;
 
     while (running) {
         memset(buffer, 0, sizeof(buffer));
@@ -30,9 +40,24 @@ void receiveMessages(SOCKET clientSocket) {
             break;
         }
 
-        std::string message(buffer, bytesReceived);
-        std::cout << "\n" << message << "\n> ";
-        std::cout.flush();
+        pendingData.append(buffer, bytesReceived);
+
+        size_t pos;
+        while ((pos = pendingData.find('\n')) != std::string::npos) {
+            std::string jsonText = pendingData.substr(0, pos);
+            pendingData.erase(0, pos + 1);
+
+            if (!jsonText.empty()) {
+                try {
+                    json response = json::parse(jsonText);
+                    std::cout << "\n[SERVER JSON]\n" << response.dump(4) << "\n> ";
+                } catch (...) {
+                    std::cout << "\n[SERVER RAW] " << jsonText << "\n> ";
+                }
+
+                std::cout.flush();
+            }
+        }
     }
 }
 
@@ -102,36 +127,46 @@ int main(int argc, char* argv[]) {
     std::cout << "> ";
     std::getline(std::cin, role);
 
-    std::string roleCommand = "ROLE " + role;
-    send(clientSocket, roleCommand.c_str(), roleCommand.size(), 0);
+    json roleMessage = {
+        {"type", "ROLE"},
+        {"role", role}
+    };
 
-    std::cout << "\nCommands:\n";
-    std::cout << "CASHIER: ORDER table=1 items=Latte x2\n";
-    std::cout << "KITCHEN: STATUS order=1 cooking\n";
-    std::cout << "MANAGER: REPORT daily revenue checked\n";
-    std::cout << "Exit: /quit\n\n";
+    sendJson(clientSocket, roleMessage);
 
-    std::string message;
+    std::cout << "\nExample messages:\n\n";
+
+    std::cout << "CASHIER order:\n";
+    std::cout << R"({"type":"ORDER","table":3,"items":[{"name":"Latte","qty":2},{"name":"Matcha","qty":1}],"note":"less sugar"})" << "\n\n";
+
+    std::cout << "KITCHEN status:\n";
+    std::cout << R"({"type":"STATUS","orderId":1,"status":"cooking"})" << "\n\n";
+
+    std::cout << "MANAGER report:\n";
+    std::cout << R"({"type":"REPORT","message":"Daily revenue checked"})" << "\n\n";
+
+    std::cout << "Type JSON message and press Enter. Type /quit to exit.\n\n";
+
+    std::string input;
 
     while (running) {
         std::cout << "> ";
-        std::getline(std::cin, message);
+        std::getline(std::cin, input);
 
-        if (message == "/quit") {
+        if (input == "/quit") {
             running = false;
             break;
         }
 
-        if (message.empty()) {
+        if (input.empty()) {
             continue;
         }
 
-        int sendResult = send(clientSocket, message.c_str(), message.size(), 0);
-
-        if (sendResult == SOCKET_ERROR) {
-            std::cerr << "Failed to send message.\n";
-            running = false;
-            break;
+        try {
+            json message = json::parse(input);
+            sendJson(clientSocket, message);
+        } catch (...) {
+            std::cout << "Invalid JSON. Please type a valid JSON message.\n";
         }
     }
 

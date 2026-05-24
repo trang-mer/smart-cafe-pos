@@ -148,15 +148,18 @@ ClientRole Server::getClientRole(SOCKET clientSocket) {
 }
 
 void Server::sendToClient(SOCKET clientSocket, const std::string& message) {
-    send(clientSocket, message.c_str(), message.size(), 0);
+    std::string data = message + "\n";
+    send(clientSocket, data.c_str(), data.size(), 0);
 }
 
 void Server::sendToRole(ClientRole role, const std::string& message) {
     std::lock_guard<std::mutex> lock(clientsMutex);
 
+    std::string data = message + "\n";
+
     for (const auto& client : clients) {
         if (client.role == role) {
-            send(client.socket, message.c_str(), message.size(), 0);
+            send(client.socket, data.c_str(), data.size(), 0);
         }
     }
 }
@@ -164,10 +167,12 @@ void Server::sendToRole(ClientRole role, const std::string& message) {
 void Server::sendToRoles(const std::vector<ClientRole>& roles, const std::string& message) {
     std::lock_guard<std::mutex> lock(clientsMutex);
 
+    std::string data = message + "\n";
+
     for (const auto& client : clients) {
         for (ClientRole role : roles) {
             if (client.role == role) {
-                send(client.socket, message.c_str(), message.size(), 0);
+                send(client.socket, data.c_str(), data.size(), 0);
                 break;
             }
         }
@@ -175,17 +180,9 @@ void Server::sendToRoles(const std::vector<ClientRole>& roles, const std::string
 }
 
 ClientRole Server::parseRole(const std::string& roleText) {
-    if (roleText == "CASHIER") {
-        return ClientRole::CASHIER;
-    }
-
-    if (roleText == "KITCHEN") {
-        return ClientRole::KITCHEN;
-    }
-
-    if (roleText == "MANAGER") {
-        return ClientRole::MANAGER;
-    }
+    if (roleText == "CASHIER") return ClientRole::CASHIER;
+    if (roleText == "KITCHEN") return ClientRole::KITCHEN;
+    if (roleText == "MANAGER") return ClientRole::MANAGER;
 
     return ClientRole::UNKNOWN;
 }

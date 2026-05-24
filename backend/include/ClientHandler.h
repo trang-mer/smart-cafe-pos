@@ -1,6 +1,8 @@
 #ifndef CLIENT_HANDLER_H
 #define CLIENT_HANDLER_H
 
+#include <string>
+
 #ifdef _WIN32
 #include <winsock2.h>
 #else
@@ -18,7 +20,7 @@ private:
     SOCKET clientSocket;
     Server* server;
 
-    void processMessage(const std::string& message);
+    void processJsonMessage(const std::string& jsonText);
 };
 
 #endif
