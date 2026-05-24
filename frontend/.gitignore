@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cache
+.cache/
+.vite/
+.vitest/
+.turbo/
+
+# Temp files
+*.tmp
+*.temp
+*.tsbuildinfo
+
+# Generated files
+*.timestamp*
+routeTree.gen.ts
+
+# Coverage
+coverage/
+
+# Lock files (optional - uncomment if you don't want to commit package-lock)
+# package-lock.json
