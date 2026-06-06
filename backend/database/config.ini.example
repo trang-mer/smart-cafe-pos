@@ -1,0 +1,14 @@
+-- Smart Cafe POS - Configuration
+-- Copy this file to config.ini and modify values
+
+[database]
+host = localhost
+port = 5432
+dbname = smart_cafe_pos
+user = postgres
+password = your_password_here
+sslmode = disable
+
+[app]
+port = 8080
+log_level = info

@@ -1,51 +1,59 @@
 #include "OrderManager.h"
+#include "Database.h"
+#include "logger.h"
 
 #include <ctime>
 #include <iomanip>
 #include <sstream>
 
-OrderManager::OrderManager()
-    : nextOrderId(1) {}
+OrderManager::OrderManager() {}
 
 int OrderManager::createOrder(
     int tableNumber,
     const json& itemsJson,
-    const std::string& note
+    const std::string& note,
+    int createdBy
 ) {
-    std::lock_guard<std::mutex> lock(ordersMutex);
+    Database& db = Database::getInstance();
+    
+    double total = 0;
+    for (const auto& itemJson : itemsJson) {
+        total += itemJson.value("qty", 1) * itemJson.value("price", 0.0);
+    }
 
-    Order order;
-    order.id = nextOrderId++;
+    OrderEntity order;
     order.tableNumber = tableNumber;
+    order.priority = "normal";
     order.note = note;
     order.status = OrderStatus::PENDING;
+    order.total = total;
+    order.createdBy = createdBy;
     order.createdAt = getCurrentDateTime();
 
+    int orderId = db.insertOrder(order);
+
+    if (orderId <= 0) {
+        Logger::error("Failed to create order");
+        return -1;
+    }
+
     for (const auto& itemJson : itemsJson) {
-        OrderItem item;
+        OrderItemEntity item;
+        item.orderId = orderId;
+        item.menuItemId = 0;
         item.name = itemJson.value("name", "Unknown");
         item.qty = itemJson.value("qty", 1);
         item.price = itemJson.value("price", 0.0);
-
-        order.items.push_back(item);
+        db.insertOrderItem(item);
     }
 
-    orders.push_back(order);
-
-    return order.id;
+    Logger::info("Order #" + std::to_string(orderId) + " created for table " + std::to_string(tableNumber));
+    return orderId;
 }
 
 bool OrderManager::updateOrderStatus(int orderId, OrderStatus status) {
-    std::lock_guard<std::mutex> lock(ordersMutex);
-
-    for (auto& order : orders) {
-        if (order.id == orderId) {
-            order.status = status;
-            return true;
-        }
-    }
-
-    return false;
+    Database& db = Database::getInstance();
+    return db.updateOrderStatus(orderId, status);
 }
 
 bool OrderManager::cancelOrder(int orderId) {
@@ -53,120 +61,84 @@ bool OrderManager::cancelOrder(int orderId) {
 }
 
 json OrderManager::getOrderJson(int orderId) {
-    std::lock_guard<std::mutex> lock(ordersMutex);
+    Database& db = Database::getInstance();
+    OrderEntity order = db.getOrderById(orderId);
 
-    for (const auto& order : orders) {
-        if (order.id == orderId) {
-            return orderToJson(order);
-        }
+    if (order.id <= 0) {
+        return {{"error", "Order not found"}, {"orderId", orderId}};
     }
 
-    return {
-        {"error", "Order not found"},
-        {"orderId", orderId}
-    };
+    return orderEntityToJson(order);
 }
 
 json OrderManager::getAllOrdersJson() {
-    std::lock_guard<std::mutex> lock(ordersMutex);
+    Database& db = Database::getInstance();
+    std::vector<OrderEntity> orders = db.getAllOrders();
 
     json result = json::array();
-
     for (const auto& order : orders) {
-        result.push_back(orderToJson(order));
+        result.push_back(orderEntityToJson(order));
     }
 
     return result;
 }
 
 json OrderManager::getOrdersByStatus(const std::string& status) {
-    std::lock_guard<std::mutex> lock(ordersMutex);
+    Database& db = Database::getInstance();
+    OrderStatus targetStatus = parseStatus(status);
+    std::vector<OrderEntity> orders = db.getOrdersByStatus(targetStatus);
 
     json result = json::array();
-    OrderStatus targetStatus = parseStatus(status);
-
     for (const auto& order : orders) {
-        if (order.status == targetStatus) {
-            result.push_back(orderToJson(order));
-        }
+        result.push_back(orderEntityToJson(order));
     }
 
     return result;
 }
 
 json OrderManager::getOrdersByTable(int tableNumber) {
-    std::lock_guard<std::mutex> lock(ordersMutex);
+    Database& db = Database::getInstance();
+    std::vector<OrderEntity> orders = db.getOrdersByTable(tableNumber);
 
     json result = json::array();
-
     for (const auto& order : orders) {
-        if (order.tableNumber == tableNumber) {
-            result.push_back(orderToJson(order));
-        }
+        result.push_back(orderEntityToJson(order));
     }
 
     return result;
 }
 
 int OrderManager::getPendingOrderCount() {
-    std::lock_guard<std::mutex> lock(ordersMutex);
-
-    int count = 0;
-    for (const auto& order : orders) {
-        if (order.status == OrderStatus::PENDING) {
-            count++;
-        }
-    }
-    return count;
+    Database& db = Database::getInstance();
+    std::vector<OrderEntity> orders = db.getOrdersByStatus(OrderStatus::PENDING);
+    return static_cast<int>(orders.size());
 }
 
 int OrderManager::getCookingOrderCount() {
-    std::lock_guard<std::mutex> lock(ordersMutex);
-
-    int count = 0;
-    for (const auto& order : orders) {
-        if (order.status == OrderStatus::COOKING) {
-            count++;
-        }
-    }
-    return count;
+    Database& db = Database::getInstance();
+    std::vector<OrderEntity> orders = db.getOrdersByStatus(OrderStatus::COOKING);
+    return static_cast<int>(orders.size());
 }
 
 OrderStatus OrderManager::parseStatus(const std::string& statusText) {
     if (statusText == "new" || statusText == "pending") return OrderStatus::PENDING;
-    if (statusText == "cooking" || statusText == "cooking") return OrderStatus::COOKING;
+    if (statusText == "cooking") return OrderStatus::COOKING;
     if (statusText == "done" || statusText == "completed") return OrderStatus::DONE;
-    if (statusText == "paid" || statusText == "paid") return OrderStatus::PAID;
-    if (statusText == "cancelled" || statusText == "cancelled") return OrderStatus::CANCELLED;
+    if (statusText == "paid") return OrderStatus::PAID;
+    if (statusText == "cancelled") return OrderStatus::CANCELLED;
 
     return OrderStatus::PENDING;
 }
 
 std::string OrderManager::statusToString(OrderStatus status) {
     switch (status) {
-        case OrderStatus::PENDING:
-            return "new";
-        case OrderStatus::COOKING:
-            return "cooking";
-        case OrderStatus::DONE:
-            return "done";
-        case OrderStatus::PAID:
-            return "paid";
-        case OrderStatus::CANCELLED:
-            return "cancelled";
-        default:
-            return "unknown";
+        case OrderStatus::PENDING: return "new";
+        case OrderStatus::COOKING: return "cooking";
+        case OrderStatus::DONE: return "done";
+        case OrderStatus::PAID: return "paid";
+        case OrderStatus::CANCELLED: return "cancelled";
+        default: return "unknown";
     }
-}
-
-std::string OrderManager::getCurrentTime() {
-    std::time_t now = std::time(nullptr);
-    std::tm* localTime = std::localtime(&now);
-
-    std::ostringstream oss;
-    oss << std::put_time(localTime, "%H:%M");
-
-    return oss.str();
 }
 
 std::string OrderManager::getCurrentDateTime() {
@@ -179,13 +151,11 @@ std::string OrderManager::getCurrentDateTime() {
     return oss.str();
 }
 
-json OrderManager::orderToJson(const Order& order) {
+json OrderManager::orderEntityToJson(const OrderEntity& order) {
     json itemsJson = json::array();
 
-    double total = 0;
     for (const auto& item : order.items) {
         double lineTotal = item.qty * item.price;
-        total += lineTotal;
         itemsJson.push_back({
             {"itemId", item.name},
             {"name", item.name},
@@ -206,12 +176,12 @@ json OrderManager::orderToJson(const Order& order) {
         {"table", order.tableNumber == 0 ? "Mang đi" : "Bàn " + std::to_string(order.tableNumber)},
         {"tableNumber", order.tableNumber},
         {"time", timeoss.str()},
-        {"priority", "normal"},
+        {"priority", order.priority},
         {"items", itemsJson},
         {"lines", itemsJson},
         {"note", order.note},
         {"status", statusToString(order.status)},
-        {"total", total},
+        {"total", order.total},
         {"createdAt", order.createdAt}
     };
 }

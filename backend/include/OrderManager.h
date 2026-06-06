@@ -1,7 +1,7 @@
 #ifndef ORDER_MANAGER_H
 #define ORDER_MANAGER_H
 
-#include "Order.h"
+#include "entity/OrderEntity.h"
 #include "nlohmann/json.hpp"
 
 #include <vector>
@@ -17,7 +17,8 @@ public:
     int createOrder(
         int tableNumber,
         const json& itemsJson,
-        const std::string& note
+        const std::string& note,
+        int createdBy = 0
     );
 
     bool updateOrderStatus(int orderId, OrderStatus status);
@@ -35,13 +36,8 @@ public:
     static std::string statusToString(OrderStatus status);
 
 private:
-    int nextOrderId;
-    std::vector<Order> orders;
-    std::mutex ordersMutex;
-
-    std::string getCurrentTime();
     std::string getCurrentDateTime();
-    json orderToJson(const Order& order);
+    json orderEntityToJson(const OrderEntity& order);
 };
 
 #endif

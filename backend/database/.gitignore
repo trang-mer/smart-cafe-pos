@@ -1,0 +1,4 @@
+# Database Config
+db_connection.ini
+*.db
+*.sqlite

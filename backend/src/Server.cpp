@@ -1,6 +1,7 @@
 #include "Server.h"
 #include "ClientHandler.h"
 #include "Logger.h"
+#include "ApiServer.h"
 
 #include <thread>
 #include <string>
@@ -31,6 +32,16 @@ bool Server::start() {
         return false;
     }
 #endif
+
+    Database& db = Database::getInstance();
+    std::string conninfo = "host=localhost port=5432 dbname=smart_cafe_pos user=postgres password=postgres sslmode=disable";
+    
+    if (!db.connect(conninfo)) {
+        Logger::error("Failed to connect to database");
+        return false;
+    }
+    
+    db.initializeDatabase();
 
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket == -1) {
@@ -271,6 +282,8 @@ void Server::stop() {
         close(serverSocket);
     }
 #endif
+
+    Database::getInstance().disconnect();
 
     Logger::info("Server stopped");
 }

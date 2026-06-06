@@ -6,6 +6,7 @@
 #include "TableManager.h"
 #include "CustomerManager.h"
 #include "StatsManager.h"
+#include "Database.h"
 
 #include <vector>
 #include <mutex>

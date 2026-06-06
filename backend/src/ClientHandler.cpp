@@ -6,6 +6,7 @@
 #include "TableManager.h"
 #include "CustomerManager.h"
 #include "StatsManager.h"
+#include "entity/OrderEntity.h"
 
 #include <string>
 #include <cstring>

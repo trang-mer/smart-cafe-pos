@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Coffee, User, ChefHat, BarChart3, Eye } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { healthApi } from "@/lib/api";
 
 export const Route = createFileRoute("/")({
   component: Login,
@@ -16,6 +17,13 @@ function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    healthApi.check().then((res) => {
+      setIsOnline(res.success);
+    }).catch(() => setIsOnline(false));
+  }, []);
 
   const targets: Record<Role, string> = {
     cashier: "/cashier",
@@ -36,8 +44,8 @@ function Login() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
-      setError("Vui lòng nhập đầy đủ thông tin");
+    if (isOnline === false) {
+      setError("Không thể kết nối đến server. Vui lòng kiểm tra server.");
       return;
     }
     setError("");
@@ -137,6 +145,9 @@ function Login() {
                 </button>
               </div>
             </div>
+            {isOnline === false && (
+              <p className="text-sm text-destructive">Server offline - vui lòng kiểm tra kết nối</p>
+            )}
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}

@@ -6,7 +6,6 @@ import {
   customerApi,
   statsApi,
 } from "./api";
-import type { OrderStatus, OrderLine, Table } from "./pos-data";
 
 export function useMenu() {
   return useQuery({
@@ -19,7 +18,7 @@ export function useMenu() {
   });
 }
 
-export function useOrders(status?: OrderStatus) {
+export function useOrders(status?: string) {
   return useQuery({
     queryKey: ["orders", status],
     queryFn: async () => {
@@ -48,7 +47,7 @@ export function useCreateOrder() {
   return useMutation({
     mutationFn: (data: {
       table: string;
-      lines: Omit<OrderLine, "name" | "price">[];
+      lines: Omit<{ itemId: string; name: string; qty: number; price: number }, "name" | "price">[];
       note?: string;
       priority?: "priority" | "normal";
     }) => orderApi.create(data),
@@ -63,7 +62,7 @@ export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
       orderApi.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -101,6 +100,17 @@ export function useCustomers() {
     queryKey: ["customers"],
     queryFn: async () => {
       const res = await customerApi.getAll();
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+  });
+}
+
+export function useStats() {
+  return useQuery({
+    queryKey: ["stats"],
+    queryFn: async () => {
+      const res = await statsApi.getAll();
       if (!res.success) throw new Error(res.error);
       return res.data!;
     },

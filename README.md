@@ -11,128 +11,95 @@ Dự án là một hệ thống POS (Point of Sale) cho quán cafe với 3 vai t
 ### Công nghệ sử dụng
 
 - **Frontend**: React + TypeScript + TailwindCSS + TanStack Router + TanStack Query
-- **Backend**: C++ (TCP Server với multi-threading)
-- **Communication**: TCP Socket với JSON messages
+- **Backend**: C++ (TCP Server + HTTP API Server)
+- **Database**: PostgreSQL
+- **Communication**: HTTP REST API + TCP Socket
 
 ---
 
-## 2. Cấu trúc dự án
+## 2. Tính năng chính
 
-```
-smart-cafe-pos/
-├── frontend/                    # React frontend (TanStack Start)
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── pos/
-│   │   │   │   └── PosShell.tsx    # Layout shell cho POS
-│   │   │   └── ui/                  # UI components (shadcn/ui)
-│   │   ├── routes/
-│   │   │   ├── __root.tsx           # Root route
-│   │   │   ├── index.tsx            # Login page
-│   │   │   ├── cashier.tsx           # Cashier layout
-│   │   │   ├── cashier.new.tsx       # Tạo order mới
-│   │   │   ├── cashier.orders.tsx    # Danh sách order
-│   │   │   ├── cashier.menu.tsx      # Xem menu
-│   │   │   ├── cashier.payment.tsx   # Thanh toán
-│   │   │   ├── cashier.history.tsx   # Lịch sử order
-│   │   │   ├── cashier.customers.tsx # Quản lý khách hàng
-│   │   │   ├── kitchen.tsx           # Trang bếp
-│   │   │   └── manager.tsx           # Trang quản lý
-│   │   ├── lib/
-│   │   │   ├── api.ts               # API client functions
-│   │   │   ├── hooks.ts             # React Query hooks
-│   │   │   ├── pos-data.ts          # Type definitions
-│   │   │   ├── utils.ts             # Utility functions
-│   │   │   ├── error-page.ts
-│   │   │   └── error-capture.ts
-│   │   ├── router.tsx               # Router configuration
-│   │   ├── styles.css               # Global styles + Tailwind
-│   │   ├── app.tsx
-│   │   └── main.tsx
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── tsconfig.json
-│
-├── backend/                     # C++ TCP Server
-│   ├── include/
-│   │   ├── Server.h             # Server class + broadcastMessage
-│   │   ├── ClientHandler.h      # Client handler + processMessage
-│   │   ├── Order.h              # Order data structures
-│   │   ├── OrderManager.h       # Order CRUD operations
-│   │   ├── MenuManager.h        # Menu management
-│   │   ├── TableManager.h       # Table/Desk management
-│   │   ├── CustomerManager.h   # Customer management
-│   │   ├── StatsManager.h      # Statistics & reporting
-│   │   └── logger.h             # Logger
-│   ├── src/
-│   │   ├── main.cpp             # Entry point
-│   │   ├── Server.cpp           # Server implementation
-│   │   ├── ClientHandler.cpp    # Full business logic
-│   │   ├── OrderManager.cpp     # Order CRUD
-│   │   ├── MenuManager.cpp      # Menu CRUD
-│   │   ├── TableManager.cpp     # Table management
-│   │   ├── CustomerManager.cpp # Customer CRUD
-│   │   ├── StatsManager.cpp    # Statistics
-│   │   └── logger.cpp           # Logger implementation
-│   ├── client/
-│   │   └── client.cpp           # Test client
-│   ├── bin/                     # Compiled binaries
-│   └── third_party/
-│       └── nlohmann/json.hpp    # JSON library (header-only)
-│
-├── docs/                       # Documentation
-├── .gitignore
-├── README.md
-└── LICENSE
+### 2.1 Quản lý Order
+- Tạo order mới với nhiều món
+- Cập nhật trạng thái order (Mới, Đang nấu, Hoàn thành, Đã thanh toán, Đã hủy)
+- Thanh toán order (Tiền mặt, Thẻ, Ví điện tử)
+- Hủy order
+- Xem lịch sử order
+
+### 2.2 Quản lý Menu
+- Danh sách món theo danh mục (Cà phê, Trà, Đá xay, Nước ép, Bánh)
+- Bật/tắt trạng thái sẵn sàng của món
+
+### 2.3 Quản lý Bàn
+- Theo dõi trạng thái bàn (Trống, Có khách, Đã đặt)
+- Gán order vào bàn
+
+### 2.4 Quản lý Khách hàng
+- Lưu thông tin khách hàng (Tên, Số điện thoại, Email)
+- Theo dõi số lần ghé thăm và tổng chi tiêu
+- Tìm kiếm khách hàng
+
+### 2.5 Thống kê & Báo cáo
+- Doanh thu theo ngày/tuần/tháng
+- Top món bán chạy
+- Thống kê order theo trạng thái
+- Doanh thu theo giờ
+
+---
+
+## 3. Cài đặt
+
+### 3.1 Yêu cầu hệ thống
+
+- **Frontend**: Node.js 18+
+- **Backend**: C++17 compiler (g++, clang++)
+- **Database**: PostgreSQL 13+
+
+### 3.2 Cài đặt PostgreSQL
+
+1. Cài đặt PostgreSQL: https://www.postgresql.org/download/
+
+2. Tạo database:
+```bash
+psql -U postgres
+CREATE DATABASE smart_cafe_pos;
+\q
 ```
 
----
+3. Chạy schema:
+```bash
+cd backend/database
+psql -U postgres -d smart_cafe_pos -f schema.sql
+psql -U postgres -d smart_cafe_pos -f init.sql
+```
 
-## 3. Tính năng đã triển khai
+### 3.3 Cài đặt Backend
 
-### 3.1 Backend (C++)
+**Windows:**
+```bash
+cd backend
 
-- [x] **broadcastMessage()** - Gửi message đến tất cả clients
-- [x] **broadcastMessageExcept()** - Gửi message trừ một socket
-- [x] **processMessage()** - Xử lý đầy đủ các message types
+g++ -std=c++17 -o bin/server.exe src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/Database.cpp src/ApiServer.cpp src/logger.cpp -lws2_32 -lpq
+```
 
-#### Message Types được hỗ trợ:
+**Linux/Mac:**
+```bash
+cd backend
 
-| Type | Vai trò | Mô tả |
-|------|---------|--------|
-| `ROLE` / `LOGIN` | ALL | Đăng nhập với vai trò |
-| `ORDER` / `CREATE_ORDER` | CASHIER | Tạo order mới |
-| `STATUS` / `UPDATE_STATUS` | KITCHEN | Cập nhật trạng thái order |
-| `PAYMENT` / `PAY` | CASHIER | Xử lý thanh toán |
-| `CANCEL_ORDER` | CASHIER, MANAGER | Hủy order |
-| `GET_ORDERS` | ALL | Lấy danh sách order |
-| `GET_ORDER` | ALL | Lấy chi tiết order |
-| `GET_MENU` | ALL | Lấy danh sách menu |
-| `GET_TABLES` | ALL | Lấy danh sách bàn |
-| `UPDATE_TABLE` | CASHIER | Cập nhật trạng thái bàn |
-| `GET_CUSTOMERS` | ALL | Lấy danh sách khách hàng |
-| `SEARCH_CUSTOMERS` | ALL | Tìm kiếm khách hàng |
-| `CREATE_CUSTOMER` | CASHIER | Tạo khách hàng mới |
-| `GET_STATS` | ALL | Lấy thống kê |
-| `REPORT` | MANAGER | Gửi thông báo đến Kitchen/Cashier |
-| `BROADCAST` | ALL | Broadcast message |
-| `PING` | ALL | Health check |
+g++ -std=c++17 -o bin/server src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/Database.cpp src/ApiServer.cpp src/logger.cpp -lpthread -lpq
+```
 
-#### Managers:
+**Chạy server:**
+```bash
+./bin/server.exe    # Windows
+./bin/server        # Linux/Mac
+```
 
-| Manager | Chức năng |
-|---------|-----------|
-| `OrderManager` | CRUD orders, status management |
-| `MenuManager` | Menu items, categories, availability |
-| `TableManager` | Tables/desks, occupancy status |
-| `CustomerManager` | Customer profiles, visit tracking |
-| `StatsManager` | Revenue, order stats, top items |
+Server chạy:
+- HTTP API: `http://localhost:8080`
+- TCP Socket: `localhost:8081`
 
----
-
-## 4. Cài đặt và chạy
-
-### Frontend
+### 3.4 Cài đặt Frontend
 
 ```bash
 cd frontend
@@ -142,86 +109,101 @@ npm run dev
 
 Frontend chạy tại `http://localhost:5173`
 
-### Backend (C++)
-
-```bash
-cd backend
-
-# Build Server (Windows)
-g++ -std=c++17 -o bin/server.exe src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/logger.cpp -lws2_32
-
-# Build Server (Linux/Mac)
-g++ -std=c++17 -o bin/server src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/logger.cpp -lpthread
-
-# Run
-./bin/server.exe    # Windows
-./bin/server        # Linux/Mac
-```
-
-Backend chạy trên cổng `8080`
-
 ---
 
-## 5. Protocol Examples
+## 4. API Endpoints
 
-### Login as CASHIER
-```json
-{"type": "LOGIN", "role": "CASHIER", "username": "HoangAnh"}
+### Health Check
+```
+GET /api/health
 ```
 
-### Create Order
-```json
-{
-  "type": "ORDER",
-  "tableNumber": 3,
-  "items": [
-    {"name": "Latte", "qty": 2, "price": 40000},
-    {"name": "Matcha", "qty": 1, "price": 40000}
-  ],
-  "note": "Less sugar"
-}
+### Menu
+```
+GET /api/menu                    # Lấy tất cả món
+GET /api/menu?category=coffee    # Lấy món theo danh mục
 ```
 
-### Kitchen Update Status
-```json
-{"type": "STATUS", "orderId": 1, "status": "cooking"}
+### Orders
+```
+GET /api/orders                  # Lấy tất cả order
+GET /api/orders/{id}             # Lấy order theo ID
+GET /api/orders?status=new       # Lấy order theo trạng thái
+POST /api/orders                 # Tạo order mới
+PATCH /api/orders/{id}           # Cập nhật order
+DELETE /api/orders/{id}          # Xóa order
 ```
 
-### Payment
-```json
-{"type": "PAYMENT", "orderId": 1, "method": "cash", "amount": 120000, "received": 150000}
+### Tables
+```
+GET /api/tables                  # Lấy tất cả bàn
+PATCH /api/tables                # Cập nhật bàn
 ```
 
-### Get Statistics (Manager)
-```json
-{"type": "GET_STATS", "period": "week", "limit": 5}
+### Customers
+```
+GET /api/customers               # Lấy tất cả khách hàng
+GET /api/customers/{id}          # Lấy khách hàng theo ID
+GET /api/customers?q=keyword     # Tìm kiếm khách hàng
+POST /api/customers              # Tạo khách hàng mới
 ```
 
-### Broadcast (Manager sends to Kitchen/Cashier)
-```json
-{"type": "REPORT", "message": "Rush hour! Prepare 5 orders ASAP"}
+### Stats
+```
+GET /api/stats                   # Lấy tất cả thống kê
+GET /api/stats?type=revenue&period=week
+GET /api/stats?type=top-items&limit=5
+GET /api/stats?type=orders
+GET /api/stats?type=revenue-by-hour
 ```
 
 ---
 
-## 6. Phương án Database
+## 5. Cấu trúc Database
 
-Hiện tại backend sử dụng **in-memory storage**. Để lưu trữ persistent:
+### Tables
 
-| Phương án | Ưu điểm | Phù hợp |
-|-----------|----------|---------|
-| **SQLite** | Không cần server, file-based | POC, dự án nhỏ |
-| **PostgreSQL** | ACID, scalable | Dự án lớn |
-| **MongoDB** | Schema linh hoạt | Rapid development |
+| Table | Mô tả |
+|-------|-------|
+| `menu_items` | Danh sách món trong menu |
+| `tables` | Thông tin bàn |
+| `customers` | Thông tin khách hàng |
+| `orders` | Đơn hàng |
+| `order_items` | Chi tiết các món trong order |
+| `daily_stats` | Thống kê doanh thu theo ngày |
+| `hourly_stats` | Thống kê doanh thu theo giờ |
+| `item_stats` | Thống kê số lượng món đã bán |
+
+---
+
+## 6. Kiến trúc hệ thống
+
+```
+┌─────────────┐     HTTP/REST      ┌─────────────┐
+│   Frontend  │ ────────────────> │  HTTP API   │
+│   (React)   │ <───────────────── │  Server     │
+└─────────────┘                    └──────┬──────┘
+                                          │
+                                    ┌─────▼─────┐
+                                    │ Database   │
+                                    │(PostgreSQL)│
+                                    └───────────┘
+
+┌─────────────┐     TCP Socket     ┌─────────────┐
+│   Clients   │ ────────────────> │  TCP Server │
+│   (Native) │ <───────────────── │             │
+└─────────────┘                    └─────────────┘
+```
 
 ---
 
 ## 7. Các bước tiếp theo
 
-1. [ ] Thêm authentication/authorization
-2. [ ] Persistent storage (SQLite/PostgreSQL)
-3. [ ] WebSocket cho real-time updates
-4. [ ] Deploy frontend + backend
+- [ ] Thêm authentication/authorization
+- [ ] WebSocket cho real-time updates
+- [ ] Deploy frontend + backend
+- [ ] Thêm tính năng quản lý kho
+- [ ] Tích hợp thanh toán online
 
 ---
 

@@ -45,6 +45,13 @@ frontend/out/
 desktop.ini
 
 # =============================================
-# Third-party libraries (if needed)
+# Database Config
+# =============================================
+backend/database/config.ini
+backend/database/*.db
+backend/database/*.sqlite
+
+# =============================================
+# Third-party libraries
 # =============================================
 # backend/third_party/ - Keep this if you want to commit nlohmann/json

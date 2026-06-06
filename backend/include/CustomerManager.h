@@ -1,23 +1,14 @@
 #ifndef CUSTOMER_MANAGER_H
 #define CUSTOMER_MANAGER_H
 
+#include "entity/CustomerEntity.h"
 #include "nlohmann/json.hpp"
+
 #include <vector>
 #include <mutex>
 #include <string>
 
 using json = nlohmann::json;
-
-struct Customer {
-    int id;
-    std::string name;
-    std::string phone;
-    std::string email;
-    int visits;
-    double totalSpent;
-    std::string createdAt;
-    std::string lastVisit;
-};
 
 class CustomerManager {
 public:
@@ -36,11 +27,8 @@ public:
     json getCustomerStats();
 
 private:
-    std::vector<Customer> customers;
-    int nextId;
-    std::mutex mutex;
     std::string getCurrentTime();
-    json customerToJson(const Customer& customer);
+    json customerEntityToJson(const CustomerEntity& customer);
 };
 
 #endif

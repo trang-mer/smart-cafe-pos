@@ -1,5 +1,5 @@
-#ifndef ORDER_H
-#define ORDER_H
+#ifndef ORDER_ENTITY_H
+#define ORDER_ENTITY_H
 
 #include <string>
 #include <vector>
@@ -17,21 +17,27 @@ enum class OrderPriority {
     PRIORITY
 };
 
-struct OrderItem {
+struct OrderItemEntity {
+    int id;
+    int orderId;
+    int menuItemId;
     std::string name;
     int qty;
     double price;
+    std::string createdAt;
 };
 
-struct Order {
+struct OrderEntity {
     int id;
     int tableNumber;
-    OrderPriority priority;
-    std::vector<OrderItem> items;
+    std::string priority;
     std::string note;
     OrderStatus status;
-    std::string createdAt;
+    double total;
     int createdBy;
+    std::string createdAt;
+    std::string updatedAt;
+    std::vector<OrderItemEntity> items;
 };
 
 #endif

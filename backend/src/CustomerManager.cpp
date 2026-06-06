@@ -1,67 +1,74 @@
 #include "CustomerManager.h"
+#include "Database.h"
 #include "logger.h"
 
 #include <algorithm>
 #include <ctime>
 #include <iomanip>
 
-CustomerManager::CustomerManager() : nextId(1) {
+CustomerManager::CustomerManager() {
     initializeDefaultCustomers();
 }
 
 void CustomerManager::initializeDefaultCustomers() {
-    std::lock_guard<std::mutex> lock(mutex);
+    Database& db = Database::getInstance();
     
-    customers = {
-        {nextId++, "Nguyễn Văn A", "0901234567", "", 24, 2400000, getCurrentTime(), getCurrentTime()},
-        {nextId++, "Trần Thị B", "0907654321", "", 18, 1800000, getCurrentTime(), getCurrentTime()},
-        {nextId++, "Lê Văn C", "0912345678", "", 12, 980000, getCurrentTime(), getCurrentTime()},
-        {nextId++, "Phạm Thị D", "0934567890", "", 8, 720000, getCurrentTime(), getCurrentTime()},
-    };
+    std::vector<CustomerEntity> customers = db.getAllCustomers();
     
-    Logger::info("Customers initialized: " + std::to_string(customers.size()) + " customers");
+    if (customers.empty()) {
+        std::vector<CustomerEntity> defaultCustomers = {
+            {0, "Nguyễn Văn A", "0901234567", "", 24, 2400000, "", ""},
+            {0, "Trần Thị B", "0907654321", "", 18, 1800000, "", ""},
+            {0, "Lê Văn C", "0912345678", "", 12, 980000, "", ""},
+            {0, "Phạm Thị D", "0934567890", "", 8, 720000, "", ""},
+        };
+        
+        for (const auto& customer : defaultCustomers) {
+            db.insertCustomer(customer);
+        }
+        
+        Logger::info("Default customers initialized: " + std::to_string(defaultCustomers.size()) + " customers");
+    } else {
+        Logger::info("Customers loaded from database: " + std::to_string(customers.size()) + " customers");
+    }
 }
 
 json CustomerManager::getAllCustomers() {
-    std::lock_guard<std::mutex> lock(mutex);
+    Database& db = Database::getInstance();
+    std::vector<CustomerEntity> customers = db.getAllCustomers();
+    
     json result = json::array();
     for (const auto& customer : customers) {
-        result.push_back(customerToJson(customer));
+        result.push_back(customerEntityToJson(customer));
     }
     return result;
 }
 
 json CustomerManager::getCustomerById(int id) {
-    std::lock_guard<std::mutex> lock(mutex);
-    for (const auto& customer : customers) {
-        if (customer.id == id) {
-            return customerToJson(customer);
-        }
+    Database& db = Database::getInstance();
+    CustomerEntity customer = db.getCustomerById(id);
+    
+    if (customer.id <= 0) {
+        return json{{"error", "Customer not found"}};
     }
-    return json{{"error", "Customer not found"}};
+    return customerEntityToJson(customer);
 }
 
 json CustomerManager::searchCustomers(const std::string& query) {
-    std::lock_guard<std::mutex> lock(mutex);
-    json result = json::array();
-    std::string lowerQuery = query;
-    std::transform(lowerQuery.begin(), lowerQuery.end(), lowerQuery.begin(), ::tolower);
+    Database& db = Database::getInstance();
+    std::vector<CustomerEntity> customers = db.searchCustomers(query);
     
+    json result = json::array();
     for (const auto& customer : customers) {
-        std::string lowerName = customer.name;
-        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), ::tolower);
-        if (lowerName.find(lowerQuery) != std::string::npos || 
-            customer.phone.find(query) != std::string::npos) {
-            result.push_back(customerToJson(customer));
-        }
+        result.push_back(customerEntityToJson(customer));
     }
     return result;
 }
 
 int CustomerManager::createCustomer(const std::string& name, const std::string& phone, const std::string& email) {
-    std::lock_guard<std::mutex> lock(mutex);
-    Customer customer;
-    customer.id = nextId++;
+    Database& db = Database::getInstance();
+    
+    CustomerEntity customer;
     customer.name = name;
     customer.phone = phone;
     customer.email = email;
@@ -69,69 +76,59 @@ int CustomerManager::createCustomer(const std::string& name, const std::string& 
     customer.totalSpent = 0;
     customer.createdAt = getCurrentTime();
     customer.lastVisit = getCurrentTime();
-    customers.push_back(customer);
-    return customer.id;
+    
+    return db.insertCustomer(customer);
 }
 
 bool CustomerManager::updateCustomer(int id, const json& data) {
-    std::lock_guard<std::mutex> lock(mutex);
-    for (auto& customer : customers) {
-        if (customer.id == id) {
-            if (data.contains("name")) customer.name = data["name"];
-            if (data.contains("phone")) customer.phone = data["phone"];
-            if (data.contains("email")) customer.email = data["email"];
-            return true;
-        }
-    }
-    return false;
+    Database& db = Database::getInstance();
+    CustomerEntity customer = db.getCustomerById(id);
+    
+    if (customer.id <= 0) return false;
+    
+    if (data.contains("name")) customer.name = data["name"];
+    if (data.contains("phone")) customer.phone = data["phone"];
+    if (data.contains("email")) customer.email = data["email"];
+    
+    return db.updateCustomer(id, customer);
 }
 
 bool CustomerManager::deleteCustomer(int id) {
-    std::lock_guard<std::mutex> lock(mutex);
-    auto it = std::remove_if(customers.begin(), customers.end(), [id](const Customer& c) {
-        return c.id == id;
-    });
-    if (it != customers.end()) {
-        customers.erase(it);
-        return true;
-    }
-    return false;
+    Database& db = Database::getInstance();
+    return db.deleteCustomer(id);
 }
 
 bool CustomerManager::incrementVisit(int id, double amount) {
-    std::lock_guard<std::mutex> lock(mutex);
-    for (auto& customer : customers) {
-        if (customer.id == id) {
-            customer.visits++;
-            customer.totalSpent += amount;
-            customer.lastVisit = getCurrentTime();
-            return true;
-        }
-    }
-    return false;
+    Database& db = Database::getInstance();
+    return db.incrementCustomerVisit(id, amount);
 }
 
 json CustomerManager::getTopCustomers(int limit) {
-    std::lock_guard<std::mutex> lock(mutex);
-    json result = json::array();
-    auto sorted = customers;
-    std::sort(sorted.begin(), sorted.end(), [](const Customer& a, const Customer& b) {
+    Database& db = Database::getInstance();
+    std::vector<CustomerEntity> customers = db.getAllCustomers();
+    
+    std::sort(customers.begin(), customers.end(), [](const CustomerEntity& a, const CustomerEntity& b) {
         return a.totalSpent > b.totalSpent;
     });
-    for (int i = 0; i < std::min((int)sorted.size(), limit); i++) {
-        result.push_back(customerToJson(sorted[i]));
+    
+    json result = json::array();
+    for (int i = 0; i < std::min((int)customers.size(), limit); i++) {
+        result.push_back(customerEntityToJson(customers[i]));
     }
     return result;
 }
 
 json CustomerManager::getCustomerStats() {
-    std::lock_guard<std::mutex> lock(mutex);
+    Database& db = Database::getInstance();
+    std::vector<CustomerEntity> customers = db.getAllCustomers();
+    
     double totalSpent = 0;
     int totalVisits = 0;
     for (const auto& customer : customers) {
         totalSpent += customer.totalSpent;
         totalVisits += customer.visits;
     }
+    
     return {
         {"totalCustomers", (int)customers.size()},
         {"totalSpent", totalSpent},
@@ -148,7 +145,7 @@ std::string CustomerManager::getCurrentTime() {
     return oss.str();
 }
 
-json CustomerManager::customerToJson(const Customer& customer) {
+json CustomerManager::customerEntityToJson(const CustomerEntity& customer) {
     return {
         {"id", std::to_string(customer.id)},
         {"name", customer.name},
