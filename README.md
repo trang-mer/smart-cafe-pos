@@ -1,172 +1,230 @@
-# Smart Cafe POS — Server/Client TCP
+# Smart Cafe POS - Hệ thống quản lý quán cafe
 
 ## 1. Tổng quan
 
-Dự án là một hệ thống **TCP Server–Client** viết bằng C++ thuần, dùng cho quản lý quán cafe. Server lắng nghe kết nối từ nhiều Client, phân quyền theo vai trò, và cho phép gửi/nhận tin nhắn giữa các Client qua Server.
+Dự án là một hệ thống POS (Point of Sale) cho quán cafe với 3 vai trò chính:
 
-- **Server**: chạy trên cổng `8080`, chấp nhận nhiều kết nối đồng thời qua multi-threading.
-- **Client**: kết nối TCP đến Server, gửi lệnh theo vai trò (CASHIER / KITCHEN / MANAGER).
-- **Hỗ trợ đa nền tảng**: Windows (Winsock2) và Unix/Linux (BSD socket).
+- **Cashier (Thu ngân)**: Tạo order, quản lý thanh toán, xem lịch sử
+- **Kitchen (Bếp)**: Nhận order, cập nhật trạng thái chế biến
+- **Manager (Quản lý)**: Xem báo cáo doanh thu, thống kê
+
+### Công nghệ sử dụng
+
+- **Frontend**: React + TypeScript + TailwindCSS + TanStack Router + TanStack Query
+- **Backend**: C++ (TCP Server với multi-threading)
+- **Communication**: TCP Socket với JSON messages
 
 ---
 
-## 2. Cấu trúc thư mục
+## 2. Cấu trúc dự án
 
 ```
-backend/
-├── include/               # File header (.h)
-│   ├── Server.h           # Định nghĩa class Server
-│   ├── ClientHandler.h    # Định nghĩa class ClientHandler
-│   └── logger.h           # Định nghĩa class Logger
-├── src/                   # File triển khai (.cpp)
-│   ├── main.cpp           # Điểm khởi chạy của Server
-│   ├── Server.cpp
-│   ├── ClientHandler.cpp
-│   └── logger.cpp
-├── client/                # Source code Client
-│   └── client.cpp
-└── bin/                   # File thực thi sau khi build
-    ├── server.exe
-    └── client.exe
+smart-cafe-pos/
+├── frontend/                    # React frontend (TanStack Start)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── pos/
+│   │   │   │   └── PosShell.tsx    # Layout shell cho POS
+│   │   │   └── ui/                  # UI components (shadcn/ui)
+│   │   ├── routes/
+│   │   │   ├── __root.tsx           # Root route
+│   │   │   ├── index.tsx            # Login page
+│   │   │   ├── cashier.tsx           # Cashier layout
+│   │   │   ├── cashier.new.tsx       # Tạo order mới
+│   │   │   ├── cashier.orders.tsx    # Danh sách order
+│   │   │   ├── cashier.menu.tsx      # Xem menu
+│   │   │   ├── cashier.payment.tsx   # Thanh toán
+│   │   │   ├── cashier.history.tsx   # Lịch sử order
+│   │   │   ├── cashier.customers.tsx # Quản lý khách hàng
+│   │   │   ├── kitchen.tsx           # Trang bếp
+│   │   │   └── manager.tsx           # Trang quản lý
+│   │   ├── lib/
+│   │   │   ├── api.ts               # API client functions
+│   │   │   ├── hooks.ts             # React Query hooks
+│   │   │   ├── pos-data.ts          # Type definitions
+│   │   │   ├── utils.ts             # Utility functions
+│   │   │   ├── error-page.ts
+│   │   │   └── error-capture.ts
+│   │   ├── router.tsx               # Router configuration
+│   │   ├── styles.css               # Global styles + Tailwind
+│   │   ├── app.tsx
+│   │   └── main.tsx
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tsconfig.json
+│
+├── backend/                     # C++ TCP Server
+│   ├── include/
+│   │   ├── Server.h             # Server class + broadcastMessage
+│   │   ├── ClientHandler.h      # Client handler + processMessage
+│   │   ├── Order.h              # Order data structures
+│   │   ├── OrderManager.h       # Order CRUD operations
+│   │   ├── MenuManager.h        # Menu management
+│   │   ├── TableManager.h       # Table/Desk management
+│   │   ├── CustomerManager.h   # Customer management
+│   │   ├── StatsManager.h      # Statistics & reporting
+│   │   └── logger.h             # Logger
+│   ├── src/
+│   │   ├── main.cpp             # Entry point
+│   │   ├── Server.cpp           # Server implementation
+│   │   ├── ClientHandler.cpp    # Full business logic
+│   │   ├── OrderManager.cpp     # Order CRUD
+│   │   ├── MenuManager.cpp      # Menu CRUD
+│   │   ├── TableManager.cpp     # Table management
+│   │   ├── CustomerManager.cpp # Customer CRUD
+│   │   ├── StatsManager.cpp    # Statistics
+│   │   └── logger.cpp           # Logger implementation
+│   ├── client/
+│   │   └── client.cpp           # Test client
+│   ├── bin/                     # Compiled binaries
+│   └── third_party/
+│       └── nlohmann/json.hpp    # JSON library (header-only)
+│
+├── docs/                       # Documentation
+├── .gitignore
+├── README.md
+└── LICENSE
 ```
 
 ---
 
-## 3. Vai trò hệ thống
+## 3. Tính năng đã triển khai
 
-Hệ thống định nghĩa 4 vai trò (enum `ClientRole`):
+### 3.1 Backend (C++)
 
-| Vai trò    | Mô tả                              |
-|------------|-------------------------------------|
-| `UNKNOWN`  | Chưa xác định (mặc định khi kết nối) |
-| `CASHIER`  | Thu ngân — gửi đơn hàng             |
-| `KITCHEN`  | Bếp — nhận đơn, cập nhật trạng thái |
-| `MANAGER`  | Quản lý — xem báo cáo               |
+- [x] **broadcastMessage()** - Gửi message đến tất cả clients
+- [x] **broadcastMessageExcept()** - Gửi message trừ một socket
+- [x] **processMessage()** - Xử lý đầy đủ các message types
 
----
+#### Message Types được hỗ trợ:
 
-## 4. Chi tiết từng thành phần
+| Type | Vai trò | Mô tả |
+|------|---------|--------|
+| `ROLE` / `LOGIN` | ALL | Đăng nhập với vai trò |
+| `ORDER` / `CREATE_ORDER` | CASHIER | Tạo order mới |
+| `STATUS` / `UPDATE_STATUS` | KITCHEN | Cập nhật trạng thái order |
+| `PAYMENT` / `PAY` | CASHIER | Xử lý thanh toán |
+| `CANCEL_ORDER` | CASHIER, MANAGER | Hủy order |
+| `GET_ORDERS` | ALL | Lấy danh sách order |
+| `GET_ORDER` | ALL | Lấy chi tiết order |
+| `GET_MENU` | ALL | Lấy danh sách menu |
+| `GET_TABLES` | ALL | Lấy danh sách bàn |
+| `UPDATE_TABLE` | CASHIER | Cập nhật trạng thái bàn |
+| `GET_CUSTOMERS` | ALL | Lấy danh sách khách hàng |
+| `SEARCH_CUSTOMERS` | ALL | Tìm kiếm khách hàng |
+| `CREATE_CUSTOMER` | CASHIER | Tạo khách hàng mới |
+| `GET_STATS` | ALL | Lấy thống kê |
+| `REPORT` | MANAGER | Gửi thông báo đến Kitchen/Cashier |
+| `BROADCAST` | ALL | Broadcast message |
+| `PING` | ALL | Health check |
 
-### 4.1. Server (`Server.h` / `Server.cpp`)
+#### Managers:
 
-**Khởi tạo & lắng nghe:**
-- `Server(port)` — khởi tạo socket server trên cổng truyền vào (mặc định `8080`).
-- `start()` — khởi tạo Winsock2 (Windows), tạo socket, bind, listen. Trả về `true` nếu thành công.
-- `run()` — vòng lặp `accept()` chờ Client kết nối. Mỗi Client mới được giao một thread riêng chạy `ClientHandler`.
-
-**Quản lý Client:**
-- `addClient()` — thêm Client vào danh sách, mặc định vai trò `UNKNOWN`.
-- `removeClient()` — xoá Client khỏi danh sách khi ngắt kết nối.
-- `setClientRole()` / `getClientRole()` — cập nhật hoặc đọc vai trò của một Client.
-- Danh sách Client được bảo vệ bởi `std::mutex` để đảm bảo thread-safety.
-
-**Gửi tin nhắn:**
-- `sendToClient()` — gửi tin nhắn đến một Client cụ thể.
-- `sendToRole()` — broadcast tin nhắn đến tất cả Client cùng vai trò.
-- `sendToRoles()` — broadcast đến nhiều vai trò cùng lúc.
-- `parseRole()` / `roleToString()` — chuyển đổi giữa chuỗi `"CASHIER"`/`"KITCHEN"`/`"MANAGER"` và enum `ClientRole`.
-
-**Dọn dẹp:**
-- `stop()` — đóng socket, gọi `WSACleanup()` (Windows) hoặc `close()` (Unix).
-
----
-
-### 4.2. ClientHandler (`ClientHandler.h` / `ClientHandler.cpp`)
-
-- **Khởi tạo:** nhận `SOCKET` của Client và con trỏ `Server` để tương tác.
-- **`handle()` — vòng lặp chính:**
-  1. `recv()` chờ dữ liệu từ Client (buffer 1024 bytes).
-  2. Nếu `bytesReceived <= 0` → Client ngắt kết nối → thoát vòng lặp.
-  3. `processMessage()` xử lý nội dung nhận được.
-  4. Gọi `server->broadcastMessage()` gửi tin đến tất cả Client khác.
-  5. Khi thoát: gọi `server->removeClient()` rồi đóng socket.
-
-> **Lưu ý:** hiện tại `ClientHandler::processMessage()` chưa triển khai — đây là nơi cần mở rộng xử lý logic theo vai trò (ORDER, STATUS, REPORT…).
+| Manager | Chức năng |
+|---------|-----------|
+| `OrderManager` | CRUD orders, status management |
+| `MenuManager` | Menu items, categories, availability |
+| `TableManager` | Tables/desks, occupancy status |
+| `CustomerManager` | Customer profiles, visit tracking |
+| `StatsManager` | Revenue, order stats, top items |
 
 ---
 
-### 4.3. Logger (`logger.h` / `logger.cpp`)
+## 4. Cài đặt và chạy
 
-- **`Logger::info(message)`** — in ra `stdout` với định dạng `[INFO][<thời gian>] <message>`.
-- **`Logger::error(message)`** — in ra `stderr` với định dạng `[ERROR][<thời gian>] <message>`.
-- Thời gian được lấy qua `ctime_s()` (Windows-safe), tự động loại bỏ ký tự xuống dòng cuối.
-
----
-
-### 4.4. Client (`client.cpp`)
-
-**Kết nối:**
-- Chấp nhận tham số dòng lệnh: `client.exe <IP> <port>` (mặc định `127.0.0.1:8080`).
-- Khởi tạo Winsock2 → tạo socket → `connect()` đến Server.
-
-**Nhận tin (thread riêng):**
-- `receiveMessages()` — chạy trên thread phụ, liên tục `recv()`, in tin nhắn nhận được ra màn hình.
-- Dùng `std::atomic<bool> running` để đồng bộ trạng thái kết thúc.
-
-**Gửi tin:**
-- Người dùng nhập vai trò: nhập `CASHIER` / `KITCHEN` / `MANAGER` → gửi lệnh `ROLE <role>`.
-- Sau đó nhập lệnh theo vai trò:
-  - `CASHIER`: `ORDER table=1 items=Latte x2`
-  - `KITCHEN`: `STATUS order=1 cooking`
-  - `MANAGER`: `REPORT daily revenue checked`
-- Gõ `/quit` để ngắt kết nối và thoát.
-
-**Dọn dẹp:** đóng socket, `WSACleanup()`, join thread.
-
----
-
-## 5. Cách build & chạy
-
-### Build (trên Windows)
+### Frontend
 
 ```bash
-# Build Server
-g++ -std=c++17 -o backend/bin/server.exe backend/src/main.cpp backend/src/Server.cpp backend/src/ClientHandler.cpp backend/src/logger.cpp -lws2_32 -lpthread
-
-# Build Client
-g++ -std=c++17 -o backend/bin/client.exe backend/client/client.cpp -lws2_32 -lpthread
+cd frontend
+npm install
+npm run dev
 ```
 
-### Chạy Server
+Frontend chạy tại `http://localhost:5173`
+
+### Backend (C++)
 
 ```bash
-backend/bin/server.exe
-# Server started on port 8080
+cd backend
+
+# Build Server (Windows)
+g++ -std=c++17 -o bin/server.exe src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/logger.cpp -lws2_32
+
+# Build Server (Linux/Mac)
+g++ -std=c++17 -o bin/server src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/logger.cpp -lpthread
+
+# Run
+./bin/server.exe    # Windows
+./bin/server        # Linux/Mac
 ```
 
-### Chạy Client (nhiều cửa sổ terminal)
+Backend chạy trên cổng `8080`
 
-```bash
-# Terminal 1 — thu ngân
-backend/bin/client.exe 127.0.0.1 8080
-# Nhập: CASHIER
+---
 
-# Terminal 2 — bếp
-backend/bin/client.exe 127.0.0.1 8080
-# Nhập: KITCHEN
+## 5. Protocol Examples
 
-# Terminal 3 — quản lý
-backend/bin/client.exe 127.0.0.1 8080
-# Nhập: MANAGER
+### Login as CASHIER
+```json
+{"type": "LOGIN", "role": "CASHIER", "username": "HoangAnh"}
+```
+
+### Create Order
+```json
+{
+  "type": "ORDER",
+  "tableNumber": 3,
+  "items": [
+    {"name": "Latte", "qty": 2, "price": 40000},
+    {"name": "Matcha", "qty": 1, "price": 40000}
+  ],
+  "note": "Less sugar"
+}
+```
+
+### Kitchen Update Status
+```json
+{"type": "STATUS", "orderId": 1, "status": "cooking"}
+```
+
+### Payment
+```json
+{"type": "PAYMENT", "orderId": 1, "method": "cash", "amount": 120000, "received": 150000}
+```
+
+### Get Statistics (Manager)
+```json
+{"type": "GET_STATS", "period": "week", "limit": 5}
+```
+
+### Broadcast (Manager sends to Kitchen/Cashier)
+```json
+{"type": "REPORT", "message": "Rush hour! Prepare 5 orders ASAP"}
 ```
 
 ---
 
-## 6. Protocol mặc định (hiện tại)
+## 6. Phương án Database
 
-Tin nhắn được truyền dạng **plain text** qua TCP:
+Hiện tại backend sử dụng **in-memory storage**. Để lưu trữ persistent:
 
-```
-ROLE <CASHIER|KITCHEN|MANAGER>
-ORDER table=1 items=Latte x2
-STATUS order=1 cooking
-REPORT daily revenue checked
-```
-
-> **Mở rộng trong tương lai:** cần triển khai `broadcastMessage()` trong `Server.cpp` (hiện chưa thấy định nghĩa) và hoàn thiện `processMessage()` trong `ClientHandler` để xử lý logic nghiệp vụ đầy đủ.
+| Phương án | Ưu điểm | Phù hợp |
+|-----------|----------|---------|
+| **SQLite** | Không cần server, file-based | POC, dự án nhỏ |
+| **PostgreSQL** | ACID, scalable | Dự án lớn |
+| **MongoDB** | Schema linh hoạt | Rapid development |
 
 ---
 
-## 7. Tác giả
+## 7. Các bước tiếp theo
 
-Copyright (c) 2026 Đinh Huyền Trang. Phát hành theo MIT License.
+1. [ ] Thêm authentication/authorization
+2. [ ] Persistent storage (SQLite/PostgreSQL)
+3. [ ] WebSocket cho real-time updates
+4. [ ] Deploy frontend + backend
+
+---
+
+## Tác giả
+
+Copyright (c) 2026 Đinh Huyền Trang. MIT License.

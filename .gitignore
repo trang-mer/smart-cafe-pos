@@ -1,9 +1,11 @@
 # =============================================
 # Build outputs
 # =============================================
-backend/bin/*.exe
-backend/bin/*.o
-backend/bin/*.obj
+backend/bin/
+backend/*.exe
+backend/*.o
+backend/*.obj
+*.exe
 
 # =============================================
 # Editor & IDE
@@ -14,9 +16,35 @@ backend/bin/*.obj
 *.swo
 *~
 .DS_Store
+Thumbs.db
 
 # =============================================
-# Logs (nếu phát sinh khi chạy)
+# Logs
 # =============================================
 *.log
 logs/
+
+# =============================================
+# Node.js / Frontend
+# =============================================
+frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/dist/
+frontend/build/
+frontend/*.tsbuildinfo
+frontend/.next/
+frontend/out/
+
+# =============================================
+# OS
+# =============================================
+*.tmp
+*.temp
+desktop.ini
+
+# =============================================
+# Third-party libraries (if needed)
+# =============================================
+# backend/third_party/ - Keep this if you want to commit nlohmann/json

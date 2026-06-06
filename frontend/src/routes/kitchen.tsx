@@ -5,11 +5,13 @@ import {
   CheckCircle2,
   ListChecks,
   BarChart3,
+  Loader2,
 } from "lucide-react";
 import { useState } from "react";
 import { PosShell } from "@/components/pos/PosShell";
-import { orders as initialOrders, type Order } from "@/lib/pos-data";
+import { useOrders, useUpdateOrderStatus } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import type { Order, OrderStatus } from "@/lib/pos-data";
 
 export const Route = createFileRoute("/kitchen")({ component: KitchenPage });
 
@@ -51,18 +53,23 @@ function KitchenPage() {
 
 function Board() {
   const [tab, setTab] = useState<"all" | "priority" | "normal">("all");
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  const visible = orders.filter((o) =>
-    tab === "all" ? true : o.priority === tab,
-  );
+  const { data: orders = [], isLoading } = useOrders();
+  const updateStatus = useUpdateOrderStatus();
+
+  const filtered = orders.filter((o) => {
+    if (tab === "all") return true;
+    return o.priority === tab;
+  });
+
   const detail = orders.find((o) => o.id === detailId);
 
-  const start = (id: string) =>
-    setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: "cooking" } : o)),
-    );
+  const handleStatusChange = (id: string, currentStatus: OrderStatus) => {
+    const nextStatus: OrderStatus =
+      currentStatus === "new" ? "cooking" : "done";
+    updateStatus.mutate({ id, status: nextStatus });
+  };
 
   return (
     <div>
@@ -90,62 +97,101 @@ function Board() {
         />
       </div>
 
-      <div className="space-y-3 mt-4">
-        {visible.map((o) => (
-          <div key={o.id} className="bg-card border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="font-bold text-lg">{o.id}</div>
-              <div className="font-semibold">{o.table}</div>
-              <div className="text-sm text-muted-foreground">{o.time}</div>
-              <div className="ml-auto">
-                {o.priority === "priority" ? (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-destructive text-destructive-foreground">
-                    ƯU TIÊN
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                    THƯỜNG
-                  </span>
-                )}
-              </div>
-            </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          Không có order nào
+        </div>
+      ) : (
+        <div className="space-y-3 mt-4">
+          {filtered.map((o) => (
+            <OrderCard
+              key={o.id}
+              order={o}
+              onStatusChange={handleStatusChange}
+              onViewDetail={() => setDetailId(o.id)}
+              isUpdating={updateStatus.isPending}
+            />
+          ))}
+        </div>
+      )}
 
-            <div className="mt-3 space-y-1 text-sm">
-              {o.lines.map((l, i) => (
-                <div key={i}>
-                  {l.qty} × {l.name}
-                </div>
-              ))}
-            </div>
+      {detail && (
+        <OrderDetailModal
+          order={detail}
+          onClose={() => setDetailId(null)}
+        />
+      )}
+    </div>
+  );
+}
 
-            <div className="flex items-end gap-3 mt-3">
-              {o.note && (
-                <div className="text-xs text-muted-foreground italic flex-1">
-                  {o.note}
-                </div>
-              )}
-              <div className="ml-auto flex gap-2">
-                <button
-                  onClick={() => start(o.id)}
-                  className="px-4 h-9 rounded-md bg-kitchen text-kitchen-foreground text-sm font-semibold hover:opacity-90"
-                >
-                  {o.status === "cooking" ? "Hoàn thành" : "Bắt đầu"}
-                </button>
-                <button
-                  onClick={() => setDetailId(o.id)}
-                  className="px-4 h-9 rounded-md border text-sm font-semibold hover:bg-muted"
-                >
-                  Chi tiết
-                </button>
-              </div>
-            </div>
+function OrderCard({
+  order,
+  onStatusChange,
+  onViewDetail,
+  isUpdating,
+}: {
+  order: Order;
+  onStatusChange: (id: string, status: OrderStatus) => void;
+  onViewDetail: () => void;
+  isUpdating: boolean;
+}) {
+  return (
+    <div className="bg-card border rounded-xl p-4">
+      <div className="flex items-center gap-3">
+        <div className="font-bold text-lg">{order.id}</div>
+        <div className="font-semibold">{order.table}</div>
+        <div className="text-sm text-muted-foreground">{order.time}</div>
+        <div className="ml-auto">
+          {order.priority === "priority" ? (
+            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-destructive text-destructive-foreground">
+              ƯU TIÊN
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+              THƯỜNG
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1 text-sm">
+        {order.lines.map((l, i) => (
+          <div key={i}>
+            {l.qty} × {l.name}
           </div>
         ))}
       </div>
 
-      {detail && (
-        <OrderDetailModal order={detail} onClose={() => setDetailId(null)} />
-      )}
+      <div className="flex items-end gap-3 mt-3">
+        {order.note && (
+          <div className="text-xs text-muted-foreground italic flex-1">
+            {order.note}
+          </div>
+        )}
+        <div className="ml-auto flex gap-2">
+          <button
+            onClick={() => onStatusChange(order.id, order.status)}
+            disabled={isUpdating}
+            className="px-4 h-9 rounded-md bg-kitchen text-kitchen-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+          >
+            {isUpdating && <Loader2 className="w-3 h-3 animate-spin" />}
+            {order.status === "cooking" || order.status === "done"
+              ? "Hoàn thành"
+              : "Bắt đầu"}
+          </button>
+          <button
+            onClick={onViewDetail}
+            className="px-4 h-9 rounded-md border text-sm font-semibold hover:bg-muted"
+          >
+            Chi tiết
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -170,7 +216,7 @@ function TabBtn({
         "px-4 h-9 rounded-md text-sm font-medium border flex items-center gap-2",
         active
           ? "bg-kitchen text-kitchen-foreground border-kitchen"
-          : "bg-card hover:bg-muted",
+          : "bg-card hover:bg-muted"
       )}
     >
       {label}
@@ -181,7 +227,7 @@ function TabBtn({
             ? "bg-white/20"
             : tone === "warning"
               ? "bg-destructive text-destructive-foreground"
-              : "bg-muted",
+              : "bg-muted"
         )}
       >
         {count}
@@ -203,9 +249,11 @@ function OrderDetailModal({
       ? 0
       : order.status === "cooking"
         ? 1
-        : order.status === "done"
+        : order.status === "done" || order.status === "paid"
           ? 2
-          : 3;
+          : 0;
+
+  const total = order.lines.reduce((s, l) => s + l.qty * l.price, 0);
 
   return (
     <div
@@ -230,13 +278,18 @@ function OrderDetailModal({
             <h3 className="font-semibold mb-3">Thông tin chung</h3>
             <Info label="Mã order" value={order.id} />
             <Info label="Bàn" value={order.table} />
-            <Info label="Thời gian" value={`24/05/2024 - ${order.time}`} />
-            <Info label="Thu ngân" value="Hoàng Anh" />
+            <Info label="Thời gian" value={order.time} />
             <Info
               label="Trạng thái"
               value={
                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-warning/20">
-                  ĐANG CHẾ BIẾN
+                  {order.status === "new"
+                    ? "MỚI"
+                    : order.status === "cooking"
+                      ? "ĐANG CHẾ BIẾN"
+                      : order.status === "done"
+                        ? "HOÀN THÀNH"
+                        : "ĐÃ THANH TOÁN"}
                 </span>
               }
             />
@@ -271,6 +324,10 @@ function OrderDetailModal({
                 </span>
               </div>
             ))}
+            <div className="flex justify-between font-semibold mt-2 pt-2">
+              <span>Tổng cộng</span>
+              <span>{total.toLocaleString("vi-VN")}đ</span>
+            </div>
           </div>
         </div>
 
@@ -287,7 +344,7 @@ function OrderDetailModal({
                     "w-7 h-7 rounded-full grid place-items-center text-xs font-bold border-2",
                     i <= currentStep
                       ? "bg-kitchen border-kitchen text-kitchen-foreground"
-                      : "bg-card border-border text-muted-foreground",
+                      : "bg-card border-border text-muted-foreground"
                   )}
                 >
                   {i < currentStep ? "✓" : i + 1}
@@ -297,19 +354,16 @@ function OrderDetailModal({
                     "text-xs mt-2 font-medium",
                     i <= currentStep
                       ? "text-foreground"
-                      : "text-muted-foreground",
+                      : "text-muted-foreground"
                   )}
                 >
                   {s}
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {i === 0 ? "14:32 24/05" : i === 1 ? "14:35 24/05" : ""}
                 </div>
                 {i < steps.length - 1 && (
                   <div
                     className={cn(
                       "absolute top-3.5 left-1/2 w-full h-0.5",
-                      i < currentStep ? "bg-kitchen" : "bg-border",
+                      i < currentStep ? "bg-kitchen" : "bg-border"
                     )}
                   />
                 )}

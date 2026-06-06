@@ -12,6 +12,11 @@ enum class OrderStatus {
     CANCELLED
 };
 
+enum class OrderPriority {
+    NORMAL,
+    PRIORITY
+};
+
 struct OrderItem {
     std::string name;
     int qty;
@@ -21,10 +26,12 @@ struct OrderItem {
 struct Order {
     int id;
     int tableNumber;
+    OrderPriority priority;
     std::vector<OrderItem> items;
     std::string note;
     OrderStatus status;
     std::string createdAt;
+    int createdBy;
 };
 
 #endif

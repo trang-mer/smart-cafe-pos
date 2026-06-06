@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   component: Login,
-  head: () => ({ meta: [{ title: "Smart Cafe POS — Đăng nhập" }] }),
+  head: () => ({ meta: [{ title: "Smart Cafe POS - Đăng nhập" }] }),
 });
 
 type Role = "cashier" | "kitchen" | "manager";
@@ -13,6 +13,10 @@ type Role = "cashier" | "kitchen" | "manager";
 function Login() {
   const [role, setRole] = useState<Role>("cashier");
   const [showPw, setShowPw] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
   const targets: Record<Role, string> = {
     cashier: "/cashier",
     kitchen: "/kitchen",
@@ -29,6 +33,15 @@ function Login() {
     { id: "kitchen", label: "KITCHEN", icon: ChefHat, tone: "kitchen" },
     { id: "manager", label: "MANAGER", icon: BarChart3, tone: "manager" },
   ];
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username || !password) {
+      setError("Vui lòng nhập đầy đủ thông tin");
+      return;
+    }
+    setError("");
+  };
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
@@ -53,7 +66,7 @@ function Login() {
             Đăng nhập để tiếp tục sử dụng hệ thống
           </p>
           <div className="text-xs text-muted-foreground mt-6">
-            © 2024 Smart Cafe POS
+            © 2026 Smart Cafe POS
           </div>
         </div>
       </div>
@@ -74,7 +87,7 @@ function Login() {
                   "rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all",
                   role === id
                     ? "border-current shadow-md scale-105"
-                    : "border-border hover:border-muted-foreground/40",
+                    : "border-border hover:border-muted-foreground/40"
                 )}
                 style={{
                   color: role === id ? `var(--color-${tone})` : undefined,
@@ -94,13 +107,15 @@ function Login() {
             ))}
           </div>
 
-          <div className="mt-6 space-y-4">
+          <form onSubmit={handleLogin} className="mt-6 space-y-4">
             <div>
               <label className="text-sm font-medium">Tên đăng nhập</label>
               <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="mt-1.5 w-full h-11 px-3 rounded-md border bg-background"
                 placeholder="Nhập tên đăng nhập"
-                defaultValue="admin"
               />
             </div>
             <div>
@@ -108,9 +123,10 @@ function Login() {
               <div className="relative mt-1.5">
                 <input
                   type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full h-11 px-3 pr-10 rounded-md border bg-background"
                   placeholder="Nhập mật khẩu"
-                  defaultValue="password"
                 />
                 <button
                   type="button"
@@ -121,11 +137,15 @@ function Login() {
                 </button>
               </div>
             </div>
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <input type="checkbox" className="rounded" /> Ghi nhớ đăng nhập
             </label>
             <Link
               to={targets[role]}
+              type="submit"
               className="block w-full h-11 rounded-md font-semibold grid place-items-center text-primary-foreground"
               style={{ backgroundColor: `var(--color-${role})` }}
             >
@@ -136,7 +156,7 @@ function Login() {
                 Quên mật khẩu?
               </a>
             </div>
-          </div>
+          </form>
         </div>
       </div>
     </div>

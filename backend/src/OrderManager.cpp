@@ -19,7 +19,7 @@ int OrderManager::createOrder(
     order.tableNumber = tableNumber;
     order.note = note;
     order.status = OrderStatus::PENDING;
-    order.createdAt = getCurrentTime();
+    order.createdAt = getCurrentDateTime();
 
     for (const auto& itemJson : itemsJson) {
         OrderItem item;
@@ -48,6 +48,10 @@ bool OrderManager::updateOrderStatus(int orderId, OrderStatus status) {
     return false;
 }
 
+bool OrderManager::cancelOrder(int orderId) {
+    return updateOrderStatus(orderId, OrderStatus::CANCELLED);
+}
+
 json OrderManager::getOrderJson(int orderId) {
     std::lock_guard<std::mutex> lock(ordersMutex);
 
@@ -58,8 +62,8 @@ json OrderManager::getOrderJson(int orderId) {
     }
 
     return {
-        {"type", "ERROR"},
-        {"message", "Order not found"}
+        {"error", "Order not found"},
+        {"orderId", orderId}
     };
 }
 
@@ -75,12 +79,65 @@ json OrderManager::getAllOrdersJson() {
     return result;
 }
 
+json OrderManager::getOrdersByStatus(const std::string& status) {
+    std::lock_guard<std::mutex> lock(ordersMutex);
+
+    json result = json::array();
+    OrderStatus targetStatus = parseStatus(status);
+
+    for (const auto& order : orders) {
+        if (order.status == targetStatus) {
+            result.push_back(orderToJson(order));
+        }
+    }
+
+    return result;
+}
+
+json OrderManager::getOrdersByTable(int tableNumber) {
+    std::lock_guard<std::mutex> lock(ordersMutex);
+
+    json result = json::array();
+
+    for (const auto& order : orders) {
+        if (order.tableNumber == tableNumber) {
+            result.push_back(orderToJson(order));
+        }
+    }
+
+    return result;
+}
+
+int OrderManager::getPendingOrderCount() {
+    std::lock_guard<std::mutex> lock(ordersMutex);
+
+    int count = 0;
+    for (const auto& order : orders) {
+        if (order.status == OrderStatus::PENDING) {
+            count++;
+        }
+    }
+    return count;
+}
+
+int OrderManager::getCookingOrderCount() {
+    std::lock_guard<std::mutex> lock(ordersMutex);
+
+    int count = 0;
+    for (const auto& order : orders) {
+        if (order.status == OrderStatus::COOKING) {
+            count++;
+        }
+    }
+    return count;
+}
+
 OrderStatus OrderManager::parseStatus(const std::string& statusText) {
-    if (statusText == "pending") return OrderStatus::PENDING;
-    if (statusText == "cooking") return OrderStatus::COOKING;
-    if (statusText == "done") return OrderStatus::DONE;
-    if (statusText == "paid") return OrderStatus::PAID;
-    if (statusText == "cancelled") return OrderStatus::CANCELLED;
+    if (statusText == "new" || statusText == "pending") return OrderStatus::PENDING;
+    if (statusText == "cooking" || statusText == "cooking") return OrderStatus::COOKING;
+    if (statusText == "done" || statusText == "completed") return OrderStatus::DONE;
+    if (statusText == "paid" || statusText == "paid") return OrderStatus::PAID;
+    if (statusText == "cancelled" || statusText == "cancelled") return OrderStatus::CANCELLED;
 
     return OrderStatus::PENDING;
 }
@@ -88,7 +145,7 @@ OrderStatus OrderManager::parseStatus(const std::string& statusText) {
 std::string OrderManager::statusToString(OrderStatus status) {
     switch (status) {
         case OrderStatus::PENDING:
-            return "pending";
+            return "new";
         case OrderStatus::COOKING:
             return "cooking";
         case OrderStatus::DONE:
@@ -107,6 +164,16 @@ std::string OrderManager::getCurrentTime() {
     std::tm* localTime = std::localtime(&now);
 
     std::ostringstream oss;
+    oss << std::put_time(localTime, "%H:%M");
+
+    return oss.str();
+}
+
+std::string OrderManager::getCurrentDateTime() {
+    std::time_t now = std::time(nullptr);
+    std::tm* localTime = std::localtime(&now);
+
+    std::ostringstream oss;
     oss << std::put_time(localTime, "%Y-%m-%d %H:%M:%S");
 
     return oss.str();
@@ -115,20 +182,36 @@ std::string OrderManager::getCurrentTime() {
 json OrderManager::orderToJson(const Order& order) {
     json itemsJson = json::array();
 
+    double total = 0;
     for (const auto& item : order.items) {
+        double lineTotal = item.qty * item.price;
+        total += lineTotal;
         itemsJson.push_back({
+            {"itemId", item.name},
             {"name", item.name},
             {"qty", item.qty},
-            {"price", item.price}
+            {"price", item.price},
+            {"total", lineTotal}
         });
     }
 
+    std::time_t now = std::time(nullptr);
+    std::tm* localTime = std::localtime(&now);
+    std::ostringstream timeoss;
+    timeoss << std::put_time(localTime, "%H:%M");
+
     return {
-        {"id", order.id},
-        {"table", order.tableNumber},
+        {"id", "#" + std::to_string(order.id)},
+        {"orderId", order.id},
+        {"table", order.tableNumber == 0 ? "Mang đi" : "Bàn " + std::to_string(order.tableNumber)},
+        {"tableNumber", order.tableNumber},
+        {"time", timeoss.str()},
+        {"priority", "normal"},
         {"items", itemsJson},
+        {"lines", itemsJson},
         {"note", order.note},
         {"status", statusToString(order.status)},
+        {"total", total},
         {"createdAt", order.createdAt}
     };
 }

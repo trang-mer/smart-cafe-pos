@@ -21,9 +21,15 @@ public:
     );
 
     bool updateOrderStatus(int orderId, OrderStatus status);
+    bool cancelOrder(int orderId);
 
     json getOrderJson(int orderId);
     json getAllOrdersJson();
+    json getOrdersByStatus(const std::string& status);
+    json getOrdersByTable(int tableNumber);
+
+    int getPendingOrderCount();
+    int getCookingOrderCount();
 
     static OrderStatus parseStatus(const std::string& statusText);
     static std::string statusToString(OrderStatus status);
@@ -34,6 +40,7 @@ private:
     std::mutex ordersMutex;
 
     std::string getCurrentTime();
+    std::string getCurrentDateTime();
     json orderToJson(const Order& order);
 };
 
