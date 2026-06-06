@@ -6,6 +6,7 @@
 #include "TableManager.h"
 #include "CustomerManager.h"
 #include "StatsManager.h"
+#include "InventoryManager.h"
 #include "Database.h"
 
 #include <vector>
@@ -59,6 +60,7 @@ public:
     TableManager& getTableManager();
     CustomerManager& getCustomerManager();
     StatsManager& getStatsManager();
+    InventoryManager& getInventoryManager();
 
     static ClientRole parseRole(const std::string& roleText);
     static std::string roleToString(ClientRole role);
@@ -76,6 +78,7 @@ private:
     TableManager tableManager;
     CustomerManager customerManager;
     StatsManager statsManager;
+    InventoryManager inventoryManager;
 };
 
 #endif

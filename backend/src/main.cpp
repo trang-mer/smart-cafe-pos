@@ -28,6 +28,7 @@ int main() {
     apiServer.setTableManager(&tcpServer.getTableManager());
     apiServer.setCustomerManager(&tcpServer.getCustomerManager());
     apiServer.setStatsManager(&tcpServer.getStatsManager());
+    apiServer.setInventoryManager(&tcpServer.getInventoryManager());
     
     apiServer.start();
     Logger::info("HTTP API Server started on port " + std::to_string(httpPort));

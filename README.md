@@ -20,6 +20,7 @@ Dự án là một hệ thống POS (Point of Sale) cho quán cafe với 3 vai t
 ## 2. Tính năng chính
 
 ### 2.1 Quản lý Order
+
 - Tạo order mới với nhiều món
 - Cập nhật trạng thái order (Mới, Đang nấu, Hoàn thành, Đã thanh toán, Đã hủy)
 - Thanh toán order (Tiền mặt, Thẻ, Ví điện tử)
@@ -27,23 +28,36 @@ Dự án là một hệ thống POS (Point of Sale) cho quán cafe với 3 vai t
 - Xem lịch sử order
 
 ### 2.2 Quản lý Menu
+
 - Danh sách món theo danh mục (Cà phê, Trà, Đá xay, Nước ép, Bánh)
 - Bật/tắt trạng thái sẵn sàng của món
 
 ### 2.3 Quản lý Bàn
+
 - Theo dõi trạng thái bàn (Trống, Có khách, Đã đặt)
 - Gán order vào bàn
 
 ### 2.4 Quản lý Khách hàng
+
 - Lưu thông tin khách hàng (Tên, Số điện thoại, Email)
 - Theo dõi số lần ghé thăm và tổng chi tiêu
 - Tìm kiếm khách hàng
 
 ### 2.5 Thống kê & Báo cáo
+
 - Doanh thu theo ngày/tuần/tháng
 - Top món bán chạy
 - Thống kê order theo trạng thái
 - Doanh thu theo giờ
+
+### 2.6 Quản lý Kho
+
+- Theo dõi nguyên liệu (tên, số lượng, đơn vị, giá nhập)
+- Phân loại nguyên liệu theo danh mục (Cà phê, Sữa, Đường, Trà, Siro, Phụ gia, Bao bì)
+- Cảnh báo tồn kho thấp (khi số lượng <= tồn tối thiểu)
+- Nhập kho với ghi chép lịch sử
+- Xuất kho với ghi chép lý do
+- Xem lịch sử nhập/xuất kho
 
 ---
 
@@ -60,6 +74,7 @@ Dự án là một hệ thống POS (Point of Sale) cho quán cafe với 3 vai t
 1. Cài đặt PostgreSQL: https://www.postgresql.org/download/
 
 2. Tạo database:
+
 ```bash
 psql -U postgres
 CREATE DATABASE smart_cafe_pos;
@@ -67,6 +82,7 @@ CREATE DATABASE smart_cafe_pos;
 ```
 
 3. Chạy schema:
+
 ```bash
 cd backend/database
 psql -U postgres -d smart_cafe_pos -f schema.sql
@@ -76,26 +92,30 @@ psql -U postgres -d smart_cafe_pos -f init.sql
 ### 3.3 Cài đặt Backend
 
 **Windows:**
+
 ```bash
 cd backend
 
-g++ -std=c++17 -o bin/server.exe src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/Database.cpp src/ApiServer.cpp src/logger.cpp -lws2_32 -lpq
+g++ -std=c++17 -o bin/server.exe src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/InventoryManager.cpp src/Database.cpp src/ApiServer.cpp src/logger.cpp -lws2_32 -lpq
 ```
 
 **Linux/Mac:**
+
 ```bash
 cd backend
 
-g++ -std=c++17 -o bin/server src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/Database.cpp src/ApiServer.cpp src/logger.cpp -lpthread -lpq
+g++ -std=c++17 -o bin/server src/main.cpp src/Server.cpp src/ClientHandler.cpp src/OrderManager.cpp src/MenuManager.cpp src/TableManager.cpp src/CustomerManager.cpp src/StatsManager.cpp src/InventoryManager.cpp src/Database.cpp src/ApiServer.cpp src/logger.cpp -lpthread -lpq
 ```
 
 **Chạy server:**
+
 ```bash
 ./bin/server.exe    # Windows
 ./bin/server        # Linux/Mac
 ```
 
 Server chạy:
+
 - HTTP API: `http://localhost:8080`
 - TCP Socket: `localhost:8081`
 
@@ -114,17 +134,20 @@ Frontend chạy tại `http://localhost:5173`
 ## 4. API Endpoints
 
 ### Health Check
+
 ```
 GET /api/health
 ```
 
 ### Menu
+
 ```
 GET /api/menu                    # Lấy tất cả món
 GET /api/menu?category=coffee    # Lấy món theo danh mục
 ```
 
 ### Orders
+
 ```
 GET /api/orders                  # Lấy tất cả order
 GET /api/orders/{id}             # Lấy order theo ID
@@ -135,12 +158,14 @@ DELETE /api/orders/{id}          # Xóa order
 ```
 
 ### Tables
+
 ```
 GET /api/tables                  # Lấy tất cả bàn
 PATCH /api/tables                # Cập nhật bàn
 ```
 
 ### Customers
+
 ```
 GET /api/customers               # Lấy tất cả khách hàng
 GET /api/customers/{id}          # Lấy khách hàng theo ID
@@ -149,6 +174,7 @@ POST /api/customers              # Tạo khách hàng mới
 ```
 
 ### Stats
+
 ```
 GET /api/stats                   # Lấy tất cả thống kê
 GET /api/stats?type=revenue&period=week
@@ -157,22 +183,39 @@ GET /api/stats?type=orders
 GET /api/stats?type=revenue-by-hour
 ```
 
+### Inventory
+
+```
+GET /api/inventory                          # Lấy tất cả nguyên liệu
+GET /api/inventory?category=coffee          # Lấy theo danh mục
+GET /api/inventory/low-stock                # Lấy nguyên liệu sắp hết
+GET /api/inventory/{id}                     # Lấy nguyên liệu theo ID
+GET /api/inventory/{id}-transactions       # Lấy lịch sử nhập/xuất
+POST /api/inventory                         # Thêm nguyên liệu mới
+POST /api/inventory                         # Nhập kho (action=import)
+POST /api/inventory                         # Xuất kho (action=export)
+PATCH /api/inventory/{id}                   # Cập nhật nguyên liệu
+DELETE /api/inventory/{id}                  # Xóa nguyên liệu
+```
+
 ---
 
 ## 5. Cấu trúc Database
 
 ### Tables
 
-| Table | Mô tả |
-|-------|-------|
-| `menu_items` | Danh sách món trong menu |
-| `tables` | Thông tin bàn |
-| `customers` | Thông tin khách hàng |
-| `orders` | Đơn hàng |
-| `order_items` | Chi tiết các món trong order |
-| `daily_stats` | Thống kê doanh thu theo ngày |
-| `hourly_stats` | Thống kê doanh thu theo giờ |
-| `item_stats` | Thống kê số lượng món đã bán |
+| Table                    | Mô tả                           |
+| ------------------------ | ------------------------------- |
+| `menu_items`             | Danh sách món trong menu        |
+| `tables`                 | Thông tin bàn                   |
+| `customers`              | Thông tin khách hàng            |
+| `orders`                 | Đơn hàng                        |
+| `order_items`            | Chi tiết các món trong order    |
+| `daily_stats`            | Thống kê doanh thu theo ngày    |
+| `hourly_stats`           | Thống kê doanh thu theo giờ     |
+| `item_stats`             | Thống kê số lượng món đã bán    |
+| `ingredients`            | Danh sách nguyên liệu trong kho |
+| `inventory_transactions` | Lịch sử nhập/xuất kho           |
 
 ---
 
@@ -200,10 +243,9 @@ GET /api/stats?type=revenue-by-hour
 ## 7. Các bước tiếp theo
 
 - [ ] Thêm authentication/authorization
-- [ ] WebSocket cho real-time updates
 - [ ] Deploy frontend + backend
-- [ ] Thêm tính năng quản lý kho
 - [ ] Tích hợp thanh toán online
+- [ ] Quản lý công thức pha chế (liên kết nguyên liệu với món)
 
 ---
 

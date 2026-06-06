@@ -734,6 +734,152 @@ bool Database::upsertItemStat(const std::string& date, const std::string& itemNa
     return true;
 }
 
+std::vector<IngredientEntity> Database::getAllIngredients() {
+    std::vector<IngredientEntity> ingredients;
+    
+    PGresult* res = query("SELECT id, name, unit, quantity, min_stock, cost_per_unit, category, created_at, updated_at FROM ingredients ORDER BY category, name");
+    
+    if (!res) return ingredients;
+    
+    int rows = PQntuples(res);
+    for (int i = 0; i < rows; i++) {
+        IngredientEntity ingredient;
+        ingredient.id = std::stoi(PQgetvalue(res, i, 0));
+        ingredient.name = PQgetvalue(res, i, 1);
+        ingredient.unit = PQgetvalue(res, i, 2);
+        ingredient.quantity = std::stod(PQgetvalue(res, i, 3));
+        ingredient.minStock = std::stod(PQgetvalue(res, i, 4));
+        ingredient.costPerUnit = std::stod(PQgetvalue(res, i, 5));
+        ingredient.category = PQgetvalue(res, i, 6);
+        ingredient.createdAt = PQgetvalue(res, i, 7);
+        ingredient.updatedAt = PQgetvalue(res, i, 8);
+        ingredients.push_back(ingredient);
+    }
+    
+    PQclear(res);
+    return ingredients;
+}
+
+IngredientEntity Database::getIngredientById(int id) {
+    IngredientEntity ingredient;
+    ingredient.id = -1;
+    
+    std::string sql = "SELECT id, name, unit, quantity, min_stock, cost_per_unit, category, created_at, updated_at FROM ingredients WHERE id = " + std::to_string(id);
+    PGresult* res = query(sql);
+    
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
+        return ingredient;
+    }
+    
+    ingredient.id = std::stoi(PQgetvalue(res, 0, 0));
+    ingredient.name = PQgetvalue(res, 0, 1);
+    ingredient.unit = PQgetvalue(res, 0, 2);
+    ingredient.quantity = std::stod(PQgetvalue(res, 0, 3));
+    ingredient.minStock = std::stod(PQgetvalue(res, 0, 4));
+    ingredient.costPerUnit = std::stod(PQgetvalue(res, 0, 5));
+    ingredient.category = PQgetvalue(res, 0, 6);
+    ingredient.createdAt = PQgetvalue(res, 0, 7);
+    ingredient.updatedAt = PQgetvalue(res, 0, 8);
+    
+    PQclear(res);
+    return ingredient;
+}
+
+bool Database::insertIngredient(const IngredientEntity& ingredient) {
+    std::ostringstream sql;
+    sql << "INSERT INTO ingredients (name, unit, quantity, min_stock, cost_per_unit, category) VALUES ("
+        << "'" << escapeString(ingredient.name) << "', "
+        << "'" << escapeString(ingredient.unit) << "', "
+        << ingredient.quantity << ", "
+        << ingredient.minStock << ", "
+        << ingredient.costPerUnit << ", "
+        << "'" << escapeString(ingredient.category) << "')";
+    
+    execute(sql.str());
+    return true;
+}
+
+bool Database::updateIngredient(int id, const IngredientEntity& ingredient) {
+    std::ostringstream sql;
+    sql << "UPDATE ingredients SET "
+        << "name = '" << escapeString(ingredient.name) << "', "
+        << "unit = '" << escapeString(ingredient.unit) << "', "
+        << "quantity = " << ingredient.quantity << ", "
+        << "min_stock = " << ingredient.minStock << ", "
+        << "cost_per_unit = " << ingredient.costPerUnit << ", "
+        << "category = '" << escapeString(ingredient.category) << "', "
+        << "updated_at = CURRENT_TIMESTAMP "
+        << "WHERE id = " << id;
+    
+    execute(sql.str());
+    return true;
+}
+
+bool Database::deleteIngredient(int id) {
+    std::string sql = "DELETE FROM ingredients WHERE id = " + std::to_string(id);
+    execute(sql);
+    return true;
+}
+
+bool Database::updateIngredientQuantity(int id, double quantity) {
+    std::ostringstream sql;
+    sql << "UPDATE ingredients SET "
+        << "quantity = " << quantity << ", "
+        << "updated_at = CURRENT_TIMESTAMP "
+        << "WHERE id = " << id;
+    
+    execute(sql.str());
+    return true;
+}
+
+std::vector<InventoryTransactionEntity> Database::getInventoryTransactions(int ingredientId) {
+    std::vector<InventoryTransactionEntity> transactions;
+    
+    std::string sql = "SELECT id, ingredient_id, type, quantity, unit_price, note, created_at FROM inventory_transactions WHERE ingredient_id = " + std::to_string(ingredientId) + " ORDER BY created_at DESC";
+    PGresult* res = query(sql);
+    
+    if (!res) return transactions;
+    
+    int rows = PQntuples(res);
+    for (int i = 0; i < rows; i++) {
+        InventoryTransactionEntity transaction;
+        transaction.id = std::stoi(PQgetvalue(res, i, 0));
+        transaction.ingredientId = std::stoi(PQgetvalue(res, i, 1));
+        transaction.type = PQgetvalue(res, i, 2);
+        transaction.quantity = std::stod(PQgetvalue(res, i, 3));
+        transaction.unitPrice = std::stod(PQgetvalue(res, i, 4));
+        transaction.note = PQgetvalue(res, i, 5);
+        transaction.createdAt = PQgetvalue(res, i, 6);
+        transactions.push_back(transaction);
+    }
+    
+    PQclear(res);
+    return transactions;
+}
+
+int Database::insertInventoryTransaction(const InventoryTransactionEntity& transaction) {
+    std::ostringstream sql;
+    sql << "INSERT INTO inventory_transactions (ingredient_id, type, quantity, unit_price, note) VALUES ("
+        << transaction.ingredientId << ", "
+        << "'" << transaction.type << "', "
+        << transaction.quantity << ", "
+        << transaction.unitPrice << ", "
+        << "'" << escapeString(transaction.note) << "') "
+        << "RETURNING id";
+    
+    PGresult* res = query(sql.str());
+    
+    if (!res || PQntuples(res) == 0) {
+        if (res) PQclear(res);
+        return -1;
+    }
+    
+    int id = std::stoi(PQgetvalue(res, 0, 0));
+    PQclear(res);
+    return id;
+}
+
 int Database::getNextOrderId() {
     PGresult* res = query("SELECT COALESCE(MAX(id), 0) + 1 FROM orders");
     if (!res || PQntuples(res) == 0) {
@@ -803,6 +949,13 @@ void Database::initializeDatabase() {
     execute("CREATE INDEX IF NOT EXISTS idx_hourly_stats_date ON hourly_stats(date)");
     execute("CREATE INDEX IF NOT EXISTS idx_item_stats_date ON item_stats(date)");
     execute("CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone)");
+    
+    execute("CREATE TABLE IF NOT EXISTS ingredients (id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL, unit VARCHAR(20) NOT NULL DEFAULT 'pcs', quantity DECIMAL(10, 2) NOT NULL DEFAULT 0, min_stock DECIMAL(10, 2) NOT NULL DEFAULT 0, cost_per_unit DECIMAL(12, 2) NOT NULL DEFAULT 0, category VARCHAR(50) DEFAULT 'general', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+    
+    execute("CREATE TABLE IF NOT EXISTS inventory_transactions (id SERIAL PRIMARY KEY, ingredient_id INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE, type VARCHAR(20) NOT NULL, quantity DECIMAL(10, 2) NOT NULL, unit_price DECIMAL(12, 2) DEFAULT 0, note TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+    
+    execute("CREATE INDEX IF NOT EXISTS idx_ingredients_category ON ingredients(category)");
+    execute("CREATE INDEX IF NOT EXISTS idx_inventory_trans_ingredient ON inventory_transactions(ingredient_id)");
     
     Logger::info("Database schema initialized");
 }

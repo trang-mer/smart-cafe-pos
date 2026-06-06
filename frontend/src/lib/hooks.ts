@@ -5,6 +5,7 @@ import {
   tableApi,
   customerApi,
   statsApi,
+  inventoryApi,
 } from "./api";
 
 export function useMenu() {
@@ -157,6 +158,132 @@ export function useRevenueByHour() {
       const res = await statsApi.getRevenueByHour();
       if (!res.success) throw new Error(res.error);
       return res.data!;
+    },
+  });
+}
+
+export function useIngredients() {
+  return useQuery({
+    queryKey: ["ingredients"],
+    queryFn: async () => {
+      const res = await inventoryApi.getAll();
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+  });
+}
+
+export function useIngredientsByCategory(category: string) {
+  return useQuery({
+    queryKey: ["ingredients", category],
+    queryFn: async () => {
+      const res = await inventoryApi.getByCategory(category);
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+  });
+}
+
+export function useLowStockIngredients() {
+  return useQuery({
+    queryKey: ["ingredients", "lowStock"],
+    queryFn: async () => {
+      const res = await inventoryApi.getLowStock();
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+  });
+}
+
+export function useInventoryTransactions(ingredientId: number) {
+  return useQuery({
+    queryKey: ["inventoryTransactions", ingredientId],
+    queryFn: async () => {
+      const res = await inventoryApi.getTransactions(ingredientId);
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+    enabled: !!ingredientId,
+  });
+}
+
+export function useCreateIngredient() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      name: string;
+      unit: string;
+      quantity: number;
+      minStock: number;
+      costPerUnit: number;
+      category: string;
+    }) => inventoryApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ingredients"] });
+    },
+  });
+}
+
+export function useUpdateIngredient() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
+      inventoryApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ingredients"] });
+    },
+  });
+}
+
+export function useDeleteIngredient() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => inventoryApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ingredients"] });
+    },
+  });
+}
+
+export function useImportStock() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      quantity,
+      unitPrice,
+      note,
+    }: {
+      id: number;
+      quantity: number;
+      unitPrice: number;
+      note?: string;
+    }) => inventoryApi.import(id, quantity, unitPrice, note),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ingredients"] });
+    },
+  });
+}
+
+export function useExportStock() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      quantity,
+      note,
+    }: {
+      id: number;
+      quantity: number;
+      note?: string;
+    }) => inventoryApi.export(id, quantity, note),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ingredients"] });
     },
   });
 }

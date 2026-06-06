@@ -11,6 +11,7 @@
 #include "entity/CustomerEntity.h"
 #include "entity/OrderEntity.h"
 #include "entity/StatsEntity.h"
+#include "entity/InventoryEntity.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -67,6 +68,16 @@ public:
 
     std::vector<ItemStatEntity> getItemStats(const std::string& date);
     bool upsertItemStat(const std::string& date, const std::string& itemName, int quantity);
+
+    std::vector<IngredientEntity> getAllIngredients();
+    IngredientEntity getIngredientById(int id);
+    bool insertIngredient(const IngredientEntity& ingredient);
+    bool updateIngredient(int id, const IngredientEntity& ingredient);
+    bool deleteIngredient(int id);
+    bool updateIngredientQuantity(int id, double quantity);
+
+    std::vector<InventoryTransactionEntity> getInventoryTransactions(int ingredientId);
+    int insertInventoryTransaction(const InventoryTransactionEntity& transaction);
 
     int getNextOrderId();
     int getNextMenuItemId();

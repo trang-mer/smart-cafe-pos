@@ -114,3 +114,56 @@ export const statsApi = {
 export const healthApi = {
   check: () => request<{ status: string }>("health"),
 };
+
+export interface Ingredient {
+  id: number;
+  name: string;
+  unit: string;
+  quantity: number;
+  minStock: number;
+  costPerUnit: number;
+  category: string;
+  lowStock: boolean;
+}
+
+export interface InventoryTransaction {
+  id: number;
+  ingredientId: number;
+  type: "import" | "export";
+  quantity: number;
+  unitPrice: number;
+  note: string;
+  createdAt: string;
+}
+
+export const inventoryApi = {
+  getAll: () => request<Ingredient[]>("inventory"),
+  getById: (id: number) => request<Ingredient>(`inventory/${id}`),
+  getByCategory: (category: string) =>
+    request<Ingredient[]>(`inventory?category=${category}`),
+  getLowStock: () => request<Ingredient[]>("inventory/low-stock"),
+  getTransactions: (ingredientId: number) =>
+    request<InventoryTransaction[]>(`inventory/${ingredientId}-transactions`),
+  create: (data: Omit<Ingredient, "id" | "lowStock">) =>
+    request<Ingredient>("inventory", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: number, data: Partial<Ingredient>) =>
+    request<Ingredient>(`inventory/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) =>
+    request<void>(`inventory/${id}`, { method: "DELETE" }),
+  import: (id: number, quantity: number, unitPrice: number, note?: string) =>
+    request<{ success: boolean }>("inventory", {
+      method: "POST",
+      body: JSON.stringify({ action: "import", id, quantity, unitPrice, note }),
+    }),
+  export: (id: number, quantity: number, note?: string) =>
+    request<{ success: boolean }>("inventory", {
+      method: "POST",
+      body: JSON.stringify({ action: "export", id, quantity, note }),
+    }),
+};

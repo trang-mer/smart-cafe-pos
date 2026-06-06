@@ -12,6 +12,7 @@
 #include "TableManager.h"
 #include "CustomerManager.h"
 #include "StatsManager.h"
+#include "InventoryManager.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -53,6 +54,7 @@ public:
     void setTableManager(TableManager* manager);
     void setCustomerManager(CustomerManager* manager);
     void setStatsManager(StatsManager* manager);
+    void setInventoryManager(InventoryManager* manager);
 
 private:
     int port;
@@ -65,6 +67,7 @@ private:
     TableManager* tableManager;
     CustomerManager* customerManager;
     StatsManager* statsManager;
+    InventoryManager* inventoryManager;
 
     std::mutex mutex;
 
@@ -78,6 +81,7 @@ private:
     HttpResponse handleTables(const std::string& path, const std::string& method, const std::string& body);
     HttpResponse handleCustomers(const std::string& path, const std::string& method, const std::string& body);
     HttpResponse handleStats(const std::string& path, const std::string& method, const std::string& body);
+    HttpResponse handleInventory(const std::string& path, const std::string& method, const std::string& body);
 
     std::string urlDecode(const std::string& str);
     std::string parseQueryParam(const std::string& query, const std::string& param);

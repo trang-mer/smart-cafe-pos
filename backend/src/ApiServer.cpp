@@ -16,7 +16,7 @@
 ApiServer::ApiServer(int port)
     : port(port), serverSocket(-1), running(false),
       menuManager(nullptr), orderManager(nullptr), tableManager(nullptr),
-      customerManager(nullptr), statsManager(nullptr) {}
+      customerManager(nullptr), statsManager(nullptr), inventoryManager(nullptr) {}
 
 ApiServer::~ApiServer() {
     stop();
@@ -95,6 +95,7 @@ void ApiServer::setOrderManager(OrderManager* manager) { orderManager = manager;
 void ApiServer::setTableManager(TableManager* manager) { tableManager = manager; }
 void ApiServer::setCustomerManager(CustomerManager* manager) { customerManager = manager; }
 void ApiServer::setStatsManager(StatsManager* manager) { statsManager = manager; }
+void ApiServer::setInventoryManager(InventoryManager* manager) { inventoryManager = manager; }
 
 void ApiServer::acceptConnections() {
     while (running) {
@@ -226,6 +227,10 @@ HttpResponse ApiServer::handleRequest(const HttpRequest& request) {
 
     if (request.path == "/api/stats" || request.path.rfind("/api/stats", 0) == 0) {
         return handleStats(request.path, request.method, request.body);
+    }
+
+    if (request.path == "/api/inventory" || request.path.rfind("/api/inventory", 0) == 0) {
+        return handleInventory(request.path, request.method, request.body);
     }
 
     return {404, "Not Found", "{\"error\":\"Not found\"}", "application/json"};
@@ -437,6 +442,114 @@ HttpResponse ApiServer::handleStats(const std::string& path, const std::string& 
         };
 
         return {200, "OK", response.dump(), "application/json"};
+    }
+
+    return {405, "Method Not Allowed", "{\"error\":\"Method not allowed\"}", "application/json"};
+}
+
+HttpResponse ApiServer::handleInventory(const std::string& path, const std::string& method, const std::string& body) {
+    std::string ingredientId;
+    size_t lastSlash = path.rfind('/');
+    if (lastSlash != std::string::npos && lastSlash > 11) {
+        std::string afterSlash = path.substr(lastSlash + 1);
+        if (!afterSlash.empty() && afterSlash != "inventory" && afterSlash.find('?') == std::string::npos) {
+            ingredientId = afterSlash;
+        }
+    }
+
+    if (method == "GET") {
+        if (!ingredientId.empty()) {
+            if (ingredientId == "low-stock") {
+                json lowStock = inventoryManager->getLowStockIngredients();
+                return {200, "OK", lowStock.dump(), "application/json"};
+            }
+            
+            if (ingredientId.find("transactions") != std::string::npos) {
+                size_t transPos = ingredientId.find("-");
+                if (transPos != std::string::npos) {
+                    std::string idStr = ingredientId.substr(0, transPos);
+                    int id = std::stoi(idStr);
+                    json transactions = inventoryManager->getInventoryTransactions(id);
+                    return {200, "OK", transactions.dump(), "application/json"};
+                }
+            }
+            
+            int id = std::stoi(ingredientId);
+            json ingredient = inventoryManager->getIngredientById(id);
+            if (ingredient.contains("error")) {
+                return {404, "Not Found", "{\"error\":\"Ingredient not found\"}", "application/json"};
+            }
+            return {200, "OK", ingredient.dump(), "application/json"};
+        }
+
+        std::string category = parseQueryParam(path, "category");
+        
+        json ingredients;
+        if (category.empty()) {
+            ingredients = inventoryManager->getAllIngredients();
+        } else {
+            ingredients = inventoryManager->getIngredientsByCategory(category);
+        }
+        
+        return {200, "OK", ingredients.dump(), "application/json"};
+    }
+
+    if (method == "POST") {
+        try {
+            json data = json::parse(body);
+            
+            if (data.contains("action")) {
+                std::string action = data["action"];
+                int id = data.value("id", 0);
+                double quantity = data.value("quantity", 0);
+                double unitPrice = data.value("unitPrice", 0);
+                std::string note = data.value("note", "");
+                
+                if (action == "import") {
+                    if (inventoryManager->importStock(id, quantity, unitPrice, note)) {
+                        return {200, "OK", "{\"success\":true}", "application/json"};
+                    }
+                } else if (action == "export") {
+                    if (inventoryManager->exportStock(id, quantity, note)) {
+                        return {200, "OK", "{\"success\":true}", "application/json"};
+                    }
+                    return {400, "Bad Request", "{\"error\":\"Not enough stock\"}", "application/json"};
+                }
+            }
+            
+            int id = inventoryManager->addIngredient(data);
+            json ingredient = inventoryManager->getIngredientById(id);
+            return {201, "Created", ingredient.dump(), "application/json"};
+        } catch (const std::exception& e) {
+            return {400, "Bad Request", "{\"error\":\"" + std::string(e.what()) + "\"}", "application/json"};
+        }
+    }
+
+    if (method == "PATCH" && !ingredientId.empty() && ingredientId.find("transactions") == std::string::npos) {
+        try {
+            json data = json::parse(body);
+            int id = std::stoi(ingredientId);
+            
+            if (inventoryManager->updateIngredient(id, data)) {
+                json ingredient = inventoryManager->getIngredientById(id);
+                return {200, "OK", ingredient.dump(), "application/json"};
+            }
+            return {404, "Not Found", "{\"error\":\"Ingredient not found\"}", "application/json"};
+        } catch (const std::exception& e) {
+            return {400, "Bad Request", "{\"error\":\"" + std::string(e.what()) + "\"}", "application/json"};
+        }
+    }
+
+    if (method == "DELETE" && !ingredientId.empty()) {
+        try {
+            int id = std::stoi(ingredientId);
+            if (inventoryManager->deleteIngredient(id)) {
+                return {200, "OK", "{\"success\":true}", "application/json"};
+            }
+            return {404, "Not Found", "{\"error\":\"Ingredient not found\"}", "application/json"};
+        } catch (const std::exception& e) {
+            return {400, "Bad Request", "{\"error\":\"" + std::string(e.what()) + "\"}", "application/json"};
+        }
     }
 
     return {405, "Method Not Allowed", "{\"error\":\"Method not allowed\"}", "application/json"};

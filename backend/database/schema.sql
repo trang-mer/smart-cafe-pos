@@ -100,6 +100,30 @@ CREATE TABLE IF NOT EXISTS item_stats (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Inventory Ingredients
+CREATE TABLE IF NOT EXISTS ingredients (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    unit VARCHAR(20) NOT NULL DEFAULT 'pcs',
+    quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    min_stock DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    cost_per_unit DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    category VARCHAR(50) DEFAULT 'general',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Inventory Transactions
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+    id SERIAL PRIMARY KEY,
+    ingredient_id INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+    type VARCHAR(20) NOT NULL,
+    quantity DECIMAL(10, 2) NOT NULL,
+    unit_price DECIMAL(12, 2) DEFAULT 0,
+    note TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================================
 -- Indexes
 -- ============================================
@@ -112,3 +136,5 @@ CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date);
 CREATE INDEX IF NOT EXISTS idx_hourly_stats_date ON hourly_stats(date);
 CREATE INDEX IF NOT EXISTS idx_item_stats_date ON item_stats(date);
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_ingredients_category ON ingredients(category);
+CREATE INDEX IF NOT EXISTS idx_inventory_trans_ingredient ON inventory_transactions(ingredient_id);

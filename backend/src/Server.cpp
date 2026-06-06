@@ -248,6 +248,10 @@ StatsManager& Server::getStatsManager() {
     return statsManager;
 }
 
+InventoryManager& Server::getInventoryManager() {
+    return inventoryManager;
+}
+
 ClientRole Server::parseRole(const std::string& roleText) {
     if (roleText == "CASHIER") return ClientRole::CASHIER;
     if (roleText == "KITCHEN") return ClientRole::KITCHEN;

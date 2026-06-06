@@ -39,3 +39,22 @@ INSERT INTO customers (name, phone, visits, total_spent) VALUES
 ('Lê Văn C', '0912345678', 12, 980000),
 ('Phạm Thị D', '0934567890', 8, 720000)
 ON CONFLICT DO NOTHING;
+
+-- ============================================
+-- Initialize Ingredients
+-- ============================================
+
+INSERT INTO ingredients (name, unit, quantity, min_stock, cost_per_unit, category) VALUES
+('Cà phê hạt', 'kg', 10, 2, 120000, 'coffee'),
+('Sữa tươi', 'lít', 20, 5, 25000, 'dairy'),
+('Đường', 'kg', 15, 3, 18000, 'sweetener'),
+('Trà', 'g', 500, 100, 500, 'tea'),
+('Matcha', 'g', 200, 50, 800, 'tea'),
+('Siro caramel', 'ml', 1000, 200, 150, 'syrup'),
+('Siro vanilla', 'ml', 800, 200, 150, 'syrup'),
+('Bột cacao', 'g', 500, 100, 400, 'additive'),
+('Whipping cream', 'lít', 5, 1, 80000, 'dairy'),
+('Đá viên', 'kg', 50, 10, 5000, 'general'),
+('Ly nhựa', 'cái', 500, 100, 2000, 'packaging'),
+('Ống hút', 'cái', 1000, 200, 500, 'packaging')
+ON CONFLICT DO NOTHING;
